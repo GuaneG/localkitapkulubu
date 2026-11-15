@@ -1,0 +1,19 @@
+*.png
+*.PNG
+!design-preview/assets/local-logo.png
+!design-preview/assets/club-demo.png
+
+.playwright-mcp/
+!design-preview/assets/goodies-demo.png
+
+# Next.js workspace and local test output
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+playwright-report/
+test-results/
+.env*
+!.env.example
+!apps/web/public/images/club-demo.png
+!apps/web/public/images/goodies-demo.png

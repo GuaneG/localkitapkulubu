@@ -1,0 +1,14 @@
+{
+  "name": "localkitapkulubu",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "dev": "pnpm --filter @local/web dev",
+    "build": "pnpm --filter @local/web build",
+    "start": "pnpm --filter @local/web start",
+    "lint": "pnpm --filter @local/web lint",
+    "typecheck": "pnpm --filter @local/web typecheck",
+    "test:e2e": "pnpm --filter @local/web test:e2e"
+  }
+}
