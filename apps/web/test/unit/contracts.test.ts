@@ -29,10 +29,20 @@ test("publication requires trimmed, non-empty fields while drafts remain editabl
 test("login identity ignores spoofed forwarding headers locally and fails closed off supported hosts", async () => {
   const { clientIp, loginEmail } = await import("../../src/server/auth/login-identity.ts");
   const request = new Request("http://127.0.0.1:3000/api/auth/sign-in/email", { headers: { "x-forwarded-for": "8.8.8.8", "x-nf-client-connection-ip": "1.1.1.1" } });
-  assert.equal(clientIp(request, { mode: "loopback", origin: "http://127.0.0.1:3000" }), "127.0.0.1");
-  assert.equal(clientIp(new Request("http://localhost:3000/api/auth/sign-in/email", { headers: { host: "127.0.0.1:3000", "x-forwarded-for": "9.9.9.9" } }), { mode: "loopback", origin: "http://127.0.0.1:3000" }), "127.0.0.1");
-  assert.throws(() => clientIp(request, { mode: "loopback", origin: "https://example.com" }));
-  assert.throws(() => clientIp(new Request("https://local.example/api/auth/sign-in/email"), { mode: "netlify", origin: "https://local.example" }));
+  assert.equal(clientIp(request, { origin: "http://127.0.0.1:3000", netlifySiteId: "example-site-id" }), "127.0.0.1");
+  assert.equal(clientIp(new Request("http://localhost:3000/api/auth/sign-in/email", { headers: { host: "127.0.0.1:3000", "x-forwarded-for": "9.9.9.9" } }), { origin: "http://127.0.0.1:3000" }), "127.0.0.1");
+  assert.throws(() => clientIp(request, { origin: "https://example.com" }));
   assert.equal(loginEmail({ email: "  PO@Example.com ", password: "secret" }), "po@example.com");
   assert.throws(() => loginEmail({ email: "x", password: "secret" }));
+});
+
+test("Netlify runtime site ID enables the platform IP check for an HTTPS deployment", async () => {
+  const { clientIp } = await import("../../src/server/auth/login-identity.ts");
+  const origin = "https://local.example";
+  const request = new Request(origin + "/api/auth/get-session", { headers: { "x-nf-client-connection-ip": "::ffff:192.0.2.1" } });
+  const config = { origin, netlifySiteId: "example-site-id" };
+  assert.equal(clientIp(request, config), "192.0.2.1");
+  assert.throws(() => clientIp(request, { origin }), /Yerel giriş/);
+  assert.throws(() => clientIp(new Request(request.url, { headers: { "x-forwarded-for": "192.0.2.1" } }), config), /Güvenilir istemci adresi/);
+  assert.throws(() => clientIp(new Request(request.url, { headers: { "x-nf-client-connection-ip": "invalid" } }), config), /Güvenilir istemci adresi/);
 });

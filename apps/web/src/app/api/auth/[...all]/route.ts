@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 async function handle(request: Request) {
   try {
     const config = authConfig();
-    const ip = clientIp(request, { mode: process.env.NETLIFY === "true" ? "netlify" : "loopback", origin: config.origin });
+    const ip = clientIp(request, { netlifySiteId: process.env.SITE_ID, origin: config.origin });
     return await handleAuthRequest(request, { auth: getAuth(), limiterPool: getLimiterPool(), origin: config.origin, ip });
   } catch (error) { return errorResponse(error); }
 }

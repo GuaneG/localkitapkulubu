@@ -15,6 +15,26 @@ Taslak ayı zorunludur; eksik çeviriler kaydedilebilir. Önizleme son kaydedilm
 
 ## Kontroller
 
+### 16 Kasım — Neon bağlantı kontrolü
+
+Kullanıcının Frankfurt’ta açtığı Neon projesinin varsayılan `production` dalına ait havuzlu `DATABASE_URL` ve doğrudan `DATABASE_URL_UNPOOLED` değerleri, Neon CLI’nin `env pull` komutuyla Git’in yok saydığı `apps/web/.env.local` dosyasına alındı. İki adresin aynı veritabanına ait olduğu ve ikisinde de uygulamanın `pg` sürücüsüyle `SELECT 1` çalıştığı doğrulandı.
+
+Bağlantı için yalnız gerekli iki ayarı alan Neon CLI `env pull` komutu seçildi. Uygulamanın bağlantı değişkeni `DATABASE_URL`. [Neon CLI ortam değişkenleri](https://neon.com/blog/branch-first-dev-loop).
+
+Kullanıcı, Netlify denemesi için `production` altında `staging` dalını açtı. Otomatik silme kapalı. Yerel `apps/web/.env.local` artık `staging` dalına bağlı. İki bağlantıda `SELECT 1` geçti. Kurulumda Drizzle migration'ları ve deneme admini için doğrudan bağlantı, uygulama için havuzlu bağlantı kullanıldı. İki migration kaydı, taslak/yayın tabloları ve tek deneme admininin Better Auth parola kaydı doğrulandı. Deneme admininin giriş bilgileri yalnız yerel dosyada. Netlify üzerinden tarayıcı girişi ve yayın akışı bekliyor. Entegrasyon testlerinin tablo sıfırlama işlemleri için ayrı, harcanabilir veritabanı kullanılır. [Güncel sonraki adımlar](NEXT_STEPS.md#uygulanacak-işler--güncel-kapsam-ve-kalan-ayrıntılar).
+
+### 16 Kasım — Netlify deneme kurulumu
+
+Kullanıcı `GuaneG/localkitapkulubu` reposunun `main` dalını Netlify’a bağladı ve ortam değişkeni importundan sonraki deploy’un tamamlandığını bildirdi. Deneme sitesi Netlify takım girişiyle korunuyor. Netlify oturumu açıldıktan sonra tarayıcıda `/en` ve `/tr` ana sayfaları, iki dilde açıklanmamış ay durumu ve `/admin/giris` formu görüldü. Deneme adminiyle oturum açma ve taslak/yayın akışı açık.
+
+Monorepo ayarları repo kökünde kurulum, `apps/web` paket dizini ve `apps/web/.next` yayın çıktısıdır. Deneme sitesinin ana deploy bağlamında `NODE_VERSION`, `DATABASE_URL`, `BETTER_AUTH_URL` ve `BETTER_AUTH_SECRET` girildi. Neon hedefi `staging`. `BETTER_AUTH_URL` Netlify adresinin origin’i ve `BETTER_AUTH_SECRET` Netlify ortamına özel. Deneme admininin parolası yalnızca yerel bootstrap/giriş için tutulur. Netlify’ın bu değişkenlerle giriş, taslak ve yayın işlemlerini çalıştırdığı henüz doğrulanmadı.
+
+İlk LOCAL. girişinde tarayıcı genel hizmet hatası gösterdi. Netlify oturumuyla yapılan salt okunur `GET /api/auth/get-session` çağrısında loopback hatası görüldü. Giriş rotası `NETLIFY` build değişkenini kontrol edince Function çalışma ortamında yerel modu seçiyordu. Yerel düzeltme, Netlify’ın Functions için sağladığı `SITE_ID` ile HTTPS kurulumunu tanıyor. Panelde ek bir ortam değişkeni gerekmiyor. Mevcut istemci IP kontrolü korunuyor. [Netlify Functions ortam değişkenleri](https://docs.netlify.com/build/functions/environment-variables/#netlify-read-only-variables).
+
+Düzeltmeden önce regresyon testi aynı hatayla kırıldı. Düzeltme sonrası 8/8 birim testi, değişen dosyaların lint kontrolü ve Next.js production build’in TypeScript kontrolü geçti. Yerelde derlenmiş rotada yapay Netlify ortamı ve geçerli platform başlığı ile oturumsuz yanıt `200`, başlık veya platform bilgisi yokken `503` doğrulandı. Netlify’da yeni deploy, gerçek IP başlığının davranışı ve deneme adminiyle giriş bekliyor.
+
+### Yerel test komutları
+
 - `pnpm test:unit`: dönem/girdi doğrulama ve yerel IP güveni.
 - `pnpm test:integration`: yalnız ayrı `TEST_DATABASE_URL` ve `ALLOW_TEST_DATABASE_RESET=1` verilirse gerçek PostgreSQL tablolarını sıfırlayarak çalışır. Uygulama `DATABASE_URL` ile aynı bağlantı reddedilir. Değişken yoksa testler açıkça atlanır; bu entegrasyon kabulü değildir.
 - `pnpm typecheck`, `pnpm lint`, `pnpm build`.
@@ -26,7 +46,7 @@ Taslak ayı zorunludur; eksik çeviriler kaydedilebilir. Önizleme son kaydedilm
 
 Gerçek `POST /api/auth/sign-in/email` isteğinde IP/normalize hesap başına kayan 900 saniyede beş başarısız parola sınırı uygulanır. PostgreSQL advisory transaction kilitleri iki anahtarı sabit sırada kilitler; auth ve limiter bağlantı havuzları ayrıdır. Yanıt sayaç transaction'ı commit edilmeden gönderilmez. 429 süresi yeni engellenmiş istekle uzamaz. Başarılı girişler sayacı sıfırlamaz; bozuk istek/altyapı hataları yanlış parola sayılmaz. Public kayıt ve kapsam dışı Better Auth HTTP yolları kapalıdır. Turnstile/honeypot admin girişinde yoktur.
 
-Yerelde yönlendirme/IP başlıkları güvenilmez; loopback bağlamı kullanılır. `NETLIFY=true` ortamında platformun `x-nf-client-connection-ip` başlığı kullanılır; eksik/geçersiz değer girişi kapatır. Netlify'nin bu başlığı gerçek istemci IP'siyle üzerine yazması ve doğrudan origin erişimi olmadığı canlı ortamda ayrıca doğrulanmalıdır. Yerel testler bu platform doğrulamasının yerine geçmez; bu teslim deploy yapmaz.
+Yerel sunucuda loopback bağlamı kullanılır ve yönlendirme başlıkları güvenilmez. Netlify Functions ortamında `SITE_ID` bulunan HTTPS kurulumunda `x-nf-client-connection-ip` zorunludur. Eksik ve geçersiz IP istekleri `503` alır. Netlify'ın başlığı gerçek istemci IP’siyle üzerine yazması ve origin erişiminin sınırı gerçek deploy’da ayrıca doğrulanmalıdır.
 
 Kaynak: [Netlify'nin bağlantı IP başlığı açıklaması](https://answers.netlify.com/t/upcoming-change-stripping-exposed-netlify-headers-from-function-and-proxy-requests/52665). Parola, oturum token'ı, cookie ve bağlantı sırları loglanmaz. Sadece tek ortak adminin kullanıcı kimliği yetkilidir; oturum sabit yedi gün sonra sona erer.
 

@@ -8,16 +8,16 @@ export function loginEmail(body: unknown): string {
   return email.trim().toLowerCase();
 }
 
-export function clientIp(request: Request, config: { mode: "loopback" | "netlify"; origin: string }): string {
-  if (config.mode === "netlify") {
-    // Only enabled by server NETLIFY=true; the platform must overwrite this header.
+export function clientIp(request: Request, config: { origin: string; netlifySiteId?: string }): string {
+  const origin = new URL(config.origin);
+  const loopback = ["127.0.0.1", "localhost", "[::1]"];
+  if (config.netlifySiteId && origin.protocol === "https:" && !loopback.includes(origin.hostname)) {
+    // Netlify must overwrite this header before forwarding the request.
     const ip = request.headers.get("x-nf-client-connection-ip");
     if (!ip || !isIP(ip)) throw new HttpError(503, "Güvenilir istemci adresi alınamadı.");
     return normalizeIp(ip);
   }
-  const origin = new URL(config.origin);
   const internal = new URL(request.url);
-  const loopback = ["127.0.0.1", "localhost", "[::1]"];
   // Next normalizes the internal URL to localhost even when bound to 127.0.0.1.
   if (!loopback.includes(origin.hostname) || !loopback.includes(internal.hostname) || internal.port !== origin.port || internal.protocol !== origin.protocol || (request.headers.has("host") && request.headers.get("host") !== origin.host)) throw new HttpError(503, "Yerel giriş yalnız loopback adresinde kullanılabilir.");
   // next dev/start bind only to 127.0.0.1. Never trust forwarded headers here.
