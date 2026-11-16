@@ -1,21 +1,25 @@
 import Image from "next/image";
 import Link from "next/link";
-import { copy, currentRead, pastReads } from "@/lib/content";
+import { connection } from "next/server";
+import { copy, monthlyCopy } from "@/lib/content";
 import { type Locale, pagePath } from "@/lib/i18n";
 import { Arrow } from "./arrow";
 import { AlbumPhotos } from "./album-photos";
-import { BookCover } from "./book-cover";
+import { MonthlyReadCover } from "./monthly-read-cover";
+import { MonthlyReadBand } from "./monthly-read-band";
+import { getPublicMonthlyRead } from "@/server/monthly-read/public";
 import { BookShelf } from "./book-shelf";
 import { NewsletterBand } from "./newsletter-band";
 import { PreviewForm } from "./preview-form";
 
-export function Home({ locale }: { locale: Locale }) {
+export async function Home({ locale }: { locale: Locale }) {
+  await connection();
+  let published;
+  try { published = await getPublicMonthlyRead(locale); }
+  catch { return <><p className="wrap" role="alert">{monthlyCopy[locale].readUnavailable}</p><NewsletterBand locale={locale} /></>; }
   return <>
-    <section className="band read-band"><div className="band-inner">
-      <div className="band-copy"><h1>Read of the month <span className="read-number">#{currentRead.number}</span></h1><p>{copy[locale].readCopy}</p></div>
-      <div className="band-art"><div className="featured-cover"><BookCover book={currentRead.book} locale={locale} /></div></div>
-    </div></section>
-    <BookShelf locale={locale}>{pastReads.map((book) => <div key={book.id} className="shelf-book" data-read-date={book.readAt}><BookCover book={book} locale={locale} /></div>)}</BookShelf>
+    <MonthlyReadBand locale={locale} read={published.current} />
+    {published.past.length > 0 && <BookShelf locale={locale}>{published.past.map((read) => <div key={read.revisionId} className="shelf-book" data-read-date={`${read.period}-01`}><MonthlyReadCover read={read} locale={locale} /></div>)}</BookShelf>}
     <NewsletterBand locale={locale} />
   </>;
 }

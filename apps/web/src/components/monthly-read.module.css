@@ -1,0 +1,13 @@
+.band { background: #bf7cab; color: #171717; }
+.inner { box-sizing: border-box; max-width: 1180px; margin: auto; padding: 40px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 75px; align-items: center; min-height: 440px; }
+.copy h1 { font: 400 42px/1.2 "Courier New", monospace; text-decoration: underline; margin: 0 0 30px; }
+.copy p { font: 400 17px/1.85 "Courier New", monospace; max-width: 49ch; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.art { display: flex; align-items: center; justify-content: flex-end; padding: 8px 28px 8px 10px; min-width: 0; }
+.featured { position: relative; width: 220px; transform: perspective(1100px) rotateY(-14deg) rotateZ(2deg); margin-right: 22px; }
+.featured::before { content: ''; position: absolute; left: -15px; top: 0; bottom: 0; width: 15px; background: #181016; transform-origin: right; transform: skewY(-21deg); }
+.featured::after { content: ''; position: absolute; left: -15px; right: 0; top: -8px; height: 8px; background: repeating-linear-gradient(#f8f7f2 0 1px, #d8d7d2 1px 2px); transform-origin: bottom; transform: skewX(-55deg); }
+.cover { box-sizing: border-box; width: 100%; aspect-ratio: 2/3; display: flex; flex-direction: column; justify-content: center; gap: 14px; padding: 20px; background: #f3eef1; border: 1px dashed #54414d; color: #171717; font: 400 14px/1.4 "Courier New", monospace; text-align: center; overflow-wrap: anywhere; }
+.cover .title { font: inherit; font-size: 19px; margin: 0; }
+.caption { font-size: 11px; }
+@media (max-width: 850px) { .inner { padding: 36px 30px; gap: 35px; min-height: 405px; } .copy h1 { font-size: 35px; } .copy p { font-size: 16px; } .featured { width: 190px; margin-right: 0; } .art { padding-right: 15px; } }
+@media (max-width: 600px) { .inner { grid-template-columns: 1fr; gap: 28px; min-height: 0; padding: 30px 22px 34px; } .copy h1 { font-size: 31px; margin-bottom: 23px; } .art { justify-content: center; padding: 15px 0 8px; } .featured { width: 165px; margin: 0 0 0 15px; } .featured::before { left: -12px; width: 12px; } .featured::after { left: -12px; height: 6px; top: -6px; } }

@@ -4,11 +4,14 @@
 !design-preview/assets/club-demo.png
 
 .playwright-mcp/
+.superpowers/
+.pnpm-store/
 !design-preview/assets/goodies-demo.png
 
 # Next.js workspace and local test output
 node_modules/
 .next/
+.next-*/
 *.tsbuildinfo
 next-env.d.ts
 playwright-report/

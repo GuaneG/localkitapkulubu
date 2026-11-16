@@ -24,3 +24,8 @@ const books: Book[] = [
 export const currentRead = { number: 38, book: books[9] };
 export const pastReads = books.slice(0, 9).sort((a, b) => b.readAt.localeCompare(a.readAt));
 export const photoPositions = ["50% 50%", "10% 45%", "80% 60%", "45% 100%", "20% 35%", "75% 40%"] as const;
+
+export const monthlyCopy = {
+  tr: { coverPlaceholder: "Kapak henüz eklenmedi", readUnannounced: "Bu ayın kitabı henüz açıklanmadı.", readUnavailable: "Ayın Kitabı şu anda yüklenemiyor. Lütfen daha sonra yeniden deneyin." },
+  en: { coverPlaceholder: "Cover coming soon", readUnannounced: "This month's book has not been announced yet.", readUnavailable: "The book of the month is temporarily unavailable. Please try again later." },
+} as const;

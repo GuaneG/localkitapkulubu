@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { seedPastReads } from "./helpers/published-fixtures";
+
+test.beforeAll(seedPastReads);
 
 test("first visit is English, chosen language is remembered, explicit URLs win", async ({ page }) => {
   await page.goto("/");
@@ -18,11 +21,12 @@ test("first visit is English, chosen language is remembered, explicit URLs win",
 });
 
 test("home is server-rendered, covers are static and the shelf scrolls", async ({ page, request }) => {
+  test.skip(!process.env.TEST_DATABASE_URL, "Requires published historical fixtures in the isolated acceptance DB.");
   const response = await request.get("/tr");
   expect(response.ok()).toBeTruthy();
   expect(await response.text()).toContain("Birlikte okuduklarımız");
   await page.goto("/tr");
-  await expect(page.getByRole("heading", { name: "Read of the month #38" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Read of the month", exact: true })).toBeVisible();
   await expect(page.locator(".read-band a, .shelf-book a, .shelf-book button")).toHaveCount(0);
   const track = page.locator(".shelf-track");
   await page.getByRole("button", { name: "Daha önce okunan kitapları göster" }).click();
@@ -81,6 +85,7 @@ test("removed and unknown pages return real 404 responses", async ({ request }) 
 });
 
 test("reduced motion stops hover scrolling but keeps the arrow usable", async ({ page }) => {
+  test.skip(!process.env.TEST_DATABASE_URL, "Requires published historical fixtures in the isolated acceptance DB.");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/en");
   const arrow = page.getByRole("button", { name: "Show earlier reads" });

@@ -1,0 +1,21 @@
+name: localkitapkulubu-test
+
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: localkitapkulubu_test
+      POSTGRES_USER: local_test
+      POSTGRES_PASSWORD: local_test_only
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "local_test", "-d", "localkitapkulubu_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres-test-data:

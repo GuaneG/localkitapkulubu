@@ -1,0 +1,22 @@
+.body { margin: 0; background: #faf8f9; color: #171717; font: 16px/1.6 "Courier New", monospace; }
+.main { max-width: 1000px; margin: auto; padding: 24px; }
+.header { border-bottom: 1px solid; padding-bottom: 12px; margin-bottom: 28px; }
+.body h1 { font-size: 26px; font-weight: 400; text-decoration: underline; }
+.body h2 { font-size: 20px; font-weight: 400; }
+.body input, .body textarea, .body button, .body select { box-sizing: border-box; font: inherit; }
+.body label { display: block; margin-top: 16px; }
+.body input, .body textarea { width: 100%; border: 1px solid #666; background: white; padding: 10px; }
+.body textarea { min-height: 130px; resize: vertical; }
+.body button, .body a { color: inherit; }
+.body button { border: 1px solid; padding: 8px 16px; background: white; cursor: pointer; }
+.body button:disabled { opacity: .55; cursor: default; }
+.body :focus-visible { outline: 3px solid #89667c; outline-offset: 3px; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 22px 0; }
+.languages { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.notice { padding: 12px; border: 1px solid #89667c; white-space: pre-wrap; overflow-wrap: anywhere; }
+.preview { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding: 30px; background: #bf7cab; }
+.preview p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cover { flex: 0 0 150px; min-height: 225px; border: 1px dashed; padding: 12px; display: grid; place-content: center; text-align: center; }
+.body fieldset { border: none; padding: 0; margin: 0; min-width: 0; }
+.body pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+@media (max-width: 650px) { .languages { grid-template-columns: 1fr; } .preview { flex-direction: column; } }

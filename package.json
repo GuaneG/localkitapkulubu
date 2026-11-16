@@ -9,6 +9,10 @@
     "start": "pnpm --filter @local/web start",
     "lint": "pnpm --filter @local/web lint",
     "typecheck": "pnpm --filter @local/web typecheck",
-    "test:e2e": "pnpm --filter @local/web test:e2e"
+    "test:e2e": "pnpm --filter @local/web test:e2e",
+    "test:unit": "pnpm --filter @local/web test:unit",
+    "test:integration": "pnpm --filter @local/web test:integration",
+    "db:migrate": "pnpm --filter @local/web db:migrate",
+    "admin:provision": "pnpm --filter @local/web admin:provision"
   }
 }
