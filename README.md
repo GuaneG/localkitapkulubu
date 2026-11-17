@@ -4,6 +4,8 @@ LOCAL. tek bir Next.js uygulaması olarak `apps/web` içinde çalışır. Ortak 
 
 ## Çalıştırma
 
+17 Kasım güvenlik güncellemesi: Next paket ailesi **16.4.6**, TypeScript-ESLint **8.73.0 → minimatch 11.0.8**. Kurulum pnpm kilidiyle sabittir; minimatch kapandı. Son audit ve açık esbuild/picomatch zincirleri [bağımlılık tesliminde](docs/DEPENDENCY_SECURITY_2026-11-17.md) kayıtlıdır. Bu kayıt deploy onayı veya sıfır bulgu iddiası değildir.
+
 17 Kasım admin arayüzü: giriş sonrası `/admin` ana menüsü; kayıtlı ay listesi, TR/EN sekmeli alanlar ve gerçek site şeridiyle anlık önizleme uygulanmıştır. Tamamen boş taslak reddedilir, kısmi içerik kaydedilebilir. Kullanım, kalıcı tasarım standardı, ortak bileşenler ve [yerel kabul sonuçları admin kılavuzundadır](docs/ADMIN_GUIDE.md#yerel-kabul--17-kasım-2026). Netlify/Neon ortamında yeni arayüzün kabulü ayrıca açıktır.
 
 Node 24.x ve pnpm 11.25.0 gerekir. Repo kökünde:
@@ -18,6 +20,8 @@ Uygulama: [Türkçe](http://127.0.0.1:3000/tr) · [English](http://127.0.0.1:300
 Production önizlemesi için geliştirme sunucusunu kapatıp `pnpm build`, ardından `pnpm start` çalıştırın. Her iki sunucu da 3000 portunu kullanır. Home verisi için migrate edilmiş `DATABASE_URL` gerekir; DB erişilemiyorsa geçici içerik hatası gösterilir. Yayın olmayan ay açıklanmamış görünür; demo kitaba düşülmez. Admin ayrıca giriş ayarlarını gerektirir. Diğer public sayfalardaki mevcut demo içerikleri/etkileşimler korunur.
 
 ## Kontroller
+
+Her özellik deploy’undan önce değişen güvenlik sınırlarını `security-audit` ile, deploy’dan sonra ilgili akışı yetkili deneme ortamında kontrol edin. Bağımlılık değişikliklerinde `pnpm audit --prod` ve `pnpm audit` çalıştırın. İlk halka açık yayından önce site genelindeki güvenlik incelemesini tamamlayın.
 
 ```powershell
 pnpm typecheck
