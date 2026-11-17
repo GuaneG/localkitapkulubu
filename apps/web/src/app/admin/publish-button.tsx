@@ -2,6 +2,9 @@
 import { useRef, useState } from "react";
 import type { PublicationReceipt } from "@/server/monthly-read/contracts";
 import styles from "./admin.module.css";
+import { AdminButton } from "./components/admin-button";
+import { AdminNotice } from "./components/admin-notice";
+import { savedAt } from "./presentation";
 
 export function PublishButton({ period, version, publication, disabled }: { period: string; version: number; publication: PublicationReceipt | null; disabled: boolean }) {
   const [receipt, setReceipt] = useState(publication);
@@ -22,9 +25,9 @@ export function PublishButton({ period, version, publication, disabled }: { peri
     finally { sending.current = false; setBusy(false); }
   }
   return <>
-    {receipt && <p>Son yayın · Sürüm {receipt.sourceVersion} · {receipt.publishedAt}</p>}
-    <div className={styles.actions}><button disabled={disabled || busy || receipt?.sourceVersion === version} onClick={() => void publish()}>{busy ? "Yayınlanıyor…" : "Yayınla"}</button></div>
-    <p role="status" aria-live="polite">{receipt?.sourceVersion === version ? "Yayınlandı. Bu kaydedilmiş sürüm ziyaretçilere açık." : ""}</p>
-    {error && <div className={styles.notice}><p role="alert">{error}</p><a href={`/admin/ayin-kitabi/onizleme?ay=${period}`}>Yayın durumunu ve önizlemeyi yeniden yükle</a> · <a href="/admin/giris" target="_blank" rel="noopener noreferrer">Ayrı sekmede giriş yap</a></div>}
+    {receipt && <p data-published-version={receipt.sourceVersion}>Son yayın: {savedAt(receipt.publishedAt)}</p>}
+    <div className={styles.actions}><AdminButton variant="primary" disabled={disabled || busy || receipt?.sourceVersion === version} onClick={() => void publish()}>{busy ? "Yayınlanıyor…" : "Yayınla"}</AdminButton></div>
+    <AdminNotice kind="success">{receipt?.sourceVersion === version ? "Yayınlandı. Bu kaydedilmiş sürüm ilgili ayın yayınıdır." : ""}</AdminNotice>
+    {error && <AdminNotice kind="error"><p>{error}</p><a href={`/admin/ayin-kitabi/onizleme?ay=${period}`}>Yayın durumunu ve önizlemeyi yeniden yükle</a> · <a href="/admin/giris" target="_blank" rel="noopener noreferrer">Ayrı sekmede giriş yap</a></AdminNotice>}
   </>;
 }

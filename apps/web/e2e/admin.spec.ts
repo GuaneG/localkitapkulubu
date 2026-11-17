@@ -39,16 +39,20 @@ test("forged, expired and non-admin sessions cannot read, write or preview a dra
     const token = await login();
     await pool.query('UPDATE auth_session SET "expiresAt" = now() - interval \'1 second\' WHERE token = $1', [token]);
     expect((await context.request.get(`${baseURL}/api/admin/ayin-kitabi/2028-11`)).status()).toBe(401);
+    expect((await context.request.get(`${baseURL}/api/admin/ayin-kitabi`)).status()).toBe(401);
     expect((await context.request.put(`${baseURL}/api/admin/ayin-kitabi/2028-11`, { headers: { origin: baseURL! }, data: input })).status()).toBe(401);
     await page.goto(`${baseURL}/admin/ayin-kitabi/onizleme?ay=2028-11&dil=tr`); await expect(page).toHaveURL(/\/admin\/giris/);
     const nextToken = await login();
     await pool.query('INSERT INTO auth_user (id, name, email, "emailVerified") VALUES ($1, $2, $3, true)', [otherId, "Non-admin", `${otherId}@example.com`]);
     await pool.query('UPDATE auth_session SET "userId" = $1 WHERE token = $2', [otherId, nextToken]);
     expect((await context.request.get(`${baseURL}/api/admin/ayin-kitabi/2028-11`)).status()).toBe(403);
+    const deniedList = await context.request.get(`${baseURL}/api/admin/ayin-kitabi`);
+    expect(deniedList.status()).toBe(403);
+    expect(deniedList.headers()["cache-control"]).toContain("no-store");
     expect((await context.request.put(`${baseURL}/api/admin/ayin-kitabi/2028-11`, { headers: { origin: baseURL! }, data: input })).status()).toBe(403);
     await page.goto(`${baseURL}/admin/ayin-kitabi/onizleme?ay=2028-11&dil=tr`);
     await expect(page.getByRole("main").getByRole("alert")).toContainText("yönetici değil");
-    await expect(page.getByRole("heading", { name: "Özel taslak önizlemesi" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Yayın öncesi son kontrol" })).toHaveCount(0);
   } finally { await pool.query("DELETE FROM auth_user WHERE id = $1", [otherId]); await pool.end(); await context.close(); }
 });
 
@@ -61,7 +65,7 @@ test("two real admin sessions preserve the stale form; preview is saved-only and
     await page.goto(`${baseURL}/admin/giris`);
     await page.getByLabel("E-posta").fill(email); await page.getByLabel("Parola", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Giriş yap", exact: true }).click();
-    await expect(page).toHaveURL(/\/admin\/ayin-kitabi/);
+    await expect(page).toHaveURL(/\/admin$/);
   }
   try {
     await signIn(a); await signIn(b);
@@ -75,7 +79,9 @@ test("two real admin sessions preserve the stale form; preview is saved-only and
     const marker = `PRIVATE-DRAFT-${Date.now()}`;
     await a.getByLabel("Kitap adı — TR").fill("Taslak kitap");
     await a.getByLabel("Şerit metni — TR").fill(marker);
+    await a.getByRole("tab", { name: "İngilizce", exact: true }).click();
     await a.getByLabel("Şerit metni — EN").fill("Saved English draft");
+    await a.getByRole("tab", { name: "Türkçe", exact: true }).click();
     await a.getByRole("button", { name: "Taslağı kaydet", exact: true }).click();
     await expect(a.getByRole("status")).toContainText("kaydedildi");
     await b.getByLabel("Şerit metni — TR").fill("İkinci oturumun korunacak metni");
@@ -90,8 +96,8 @@ test("two real admin sessions preserve the stale form; preview is saved-only and
     await b.getByRole("button", { name: "Son kaydı yükle", exact: true }).click();
     await expect(b.getByLabel("Şerit metni — TR")).toHaveValue(marker);
     await b.getByLabel("Şerit metni — TR").fill("Unsaved secret");
-    await b.getByRole("button", { name: "Önizle — TR", exact: true }).click();
-    await expect(b.getByRole("main").getByRole("alert")).toContainText("Önce");
+    await expect(b.getByRole("button", { name: "Yayın öncesi son kontrol", exact: true })).toBeDisabled();
+    await expect(b.getByText(/Son kontrolden önce/)).toBeVisible();
     await b.route("**/api/admin/ayin-kitabi/*", (route) => route.request().method() === "PUT" ? route.abort("connectionfailed") : route.continue());
     await b.getByRole("button", { name: "Taslağı kaydet", exact: true }).click();
     await expect(b.getByRole("main").getByRole("alert")).toContainText("Metniniz korundu");

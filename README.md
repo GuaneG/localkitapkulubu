@@ -4,6 +4,8 @@ LOCAL. tek bir Next.js uygulaması olarak `apps/web` içinde çalışır. Ortak 
 
 ## Çalıştırma
 
+17 Kasım admin arayüzü: giriş sonrası `/admin` ana menüsü; kayıtlı ay listesi, TR/EN sekmeli alanlar ve gerçek site şeridiyle anlık önizleme uygulanmıştır. Tamamen boş taslak reddedilir, kısmi içerik kaydedilebilir. Kullanım, kalıcı tasarım standardı, ortak bileşenler ve [yerel kabul sonuçları admin kılavuzundadır](docs/ADMIN_GUIDE.md#yerel-kabul--17-kasım-2026). Netlify/Neon ortamında yeni arayüzün kabulü ayrıca açıktır.
+
 Node 24.x ve pnpm 11.25.0 gerekir. Repo kökünde:
 
 ```powershell
@@ -27,7 +29,9 @@ pnpm test:e2e
 
 Playwright yerel sunucuyu kendisi başlatır. Mevcut Google Chrome kullanılacaksa test öncesi `$env:PLAYWRIGHT_CHANNEL='chrome'` ayarlanabilir. Production akışlarını test etmek için önce build alın; başka 3000 sunucusu açık değilken `$env:PLAYWRIGHT_PRODUCTION='1'` ile aynı test komutunu çalıştırın, sonra `Remove-Item Env:PLAYWRIGHT_PRODUCTION` ile bu tercihi kaldırın.
 
-16 Kasım yerel yayın teslimi: unit **7/7**, PostgreSQL entegrasyon **6/6**, ayrı kabul DB'sinde development ve production Playwright **15/15** geçti; lint, typecheck ve build başarılı. Ana kabul B'nin gerçek kaydı/reload kalıcılığını ve anonim TR/EN'de yayınlanana kadar A'nın korunmasını kapsar. Test DB/account ayarları olmadan bazı testler atlanır; bu kabul sayılmaz. [Sonuç ve tekrar çalıştırma](docs/MONTHLY_READ_PUBLISHING_DELIVERY.md), [Docker PostgreSQL kılavuzu](docs/LOCAL_POSTGRES_TESTS.md). Gerçek Neon/Netlify ortamı henüz doğrulanmadı.
+16 Kasım yerel yayın teslimi: unit **7/7**, PostgreSQL entegrasyon **6/6**, ayrı kabul DB'sinde development ve production Playwright **15/15** geçti; lint, typecheck ve build başarılı. Ana kabul B'nin gerçek kaydı/reload kalıcılığını ve anonim TR/EN'de yayınlanana kadar A'nın korunmasını kapsar. Test DB/account ayarları olmadan bazı testler atlanır; bu kabul sayılmaz. [Sonuç ve tekrar çalıştırma](docs/MONTHLY_READ_PUBLISHING_DELIVERY.md), [Docker PostgreSQL kılavuzu](docs/LOCAL_POSTGRES_TESTS.md).
+
+Neon’un Frankfurt projesinde yerel uygulama `staging` dalına bağlı. Havuzlu ve doğrudan bağlantı, iki migration ve deneme admini kaydı doğrulandı. Kullanıcı Netlify deneme sitesinde admin girişini doğruladı. Netlify üzerinden taslak/yayın ve platform IP başlığı kontrolleri bekliyor. [Netlify deneme kurulumu](docs/ADMIN_FIRST_DELIVERY.md#16-kasım--netlify-deneme-kurulumu).
 
 ## Mevcut kapsam
 
@@ -43,7 +47,7 @@ Kitap kapakları tıklanmaz; puanlama, arşiv, takvim ve kitap detay sayfaları 
 - Yerel `design-preview` arşivi eski statik tasarım referansı ve tasarım masasıdır; bu özellik commit'inin parçası değildir.
 - `docs`: ürün kararları, soru/cevaplar, plan ve uygulama kayıtları.
 
-**Seçili sonraki altyapı:** Netlify + Neon + Cloudflare R2 + Resend, Drizzle + Better Auth, ek hata takibi Sentry. Supabase seçilmedi. Ücretsiz başlangıç hedefi var; gerçek hesap/entegrasyon ve ücretli alım yapılmadı. İki kişinin kullanacağı tek ortak tam yetkili site admin hesabı kurulacak; teknik uyarılar geliştiriciye gidecek. Contact site içinde arşivlenmez, yalnızca PO'ya iletilecek; Gmail otomatik silinmeyecek.
+**Seçili altyapı** Netlify + Neon + Cloudflare R2 + Resend, Drizzle + Better Auth ve hata takibi için Sentry. Ücretsiz başlangıç hedefi var. İki kişinin kullanacağı tek ortak tam yetkili site admin hesabı kurulacak. Teknik uyarılar geliştiriciye gidecek. Contact site içinde arşivlenmez, yalnızca PO'ya iletilecek. Gmail otomatik silinmeyecek.
 
 ## Karar ve hazırlık kayıtları
 
@@ -52,6 +56,6 @@ Kitap kapakları tıklanmaz; puanlama, arşiv, takvim ve kitap detay sayfaları 
 - [Yayınlama planı ve uygulama sonucu](docs/superpowers/plans/2026-11-15-ayin-kitabi-yayinlama.md)
 - [Yayın teslimi ve test kanıtı](docs/MONTHLY_READ_PUBLISHING_DELIVERY.md)
 
-Domain gövdesi `localkitapkulubu`; uzantı/firma ve bülten posta kutusu henüz seçilmedi. PO gerçek TR/EN içerik ve görselleri hazırlayacak. Kitap kapağı kullanım yolu, mobil/animasyon/admin/e-posta son görünümü ve yayın tarihi ayrı açık/ertelenen işlerdir. Abone açılma/tıklama takibi kapalı; temel SEO + Search Console seçili, ayrı ziyaretçi analytics script'i yok.
+Domain gövdesi `localkitapkulubu`; uzantı/firma ve bülten posta kutusu henüz seçilmedi. PO gerçek TR/EN içerik ve görselleri hazırlayacak. Kitap kapağı kullanım yolu, mobil/animasyon/e-posta son görünümü ve yayın tarihi ayrı açık/ertelenen işlerdir. Admin ana menüsü ve editörünün onaylı standardı [admin kılavuzundadır](docs/ADMIN_GUIDE.md). Abone açılma/tıklama takibi kapalı; temel SEO + Search Console seçili, ayrı ziyaretçi analytics script'i yok.
 
 Ham kaynak/oturum notları, kişisel işletim adresleri ve PO paylaşım PDF'si yerelde korunur; bu commit kapsamında paylaşılmaz. Gerçek `.env` değerleri ve hiçbir parola veya secret belgeye yazılmaz. Yalnız yer tutuculu `.env.example` paylaşılır.

@@ -2,25 +2,67 @@ import "server-only";
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 import type { Database } from "../db/client";
 import { book, monthlyReadDraft, monthlyReadPublication, monthlyReadRevision } from "../db/schema";
-import { HttpError, parseDraftInput, parsePeriod, parsePublishInput, publicationIssues, type Draft, type DraftFields, type DraftInput, type PublicationReceipt, type PublishedRevision, type PublishInput } from "./contracts";
+import { HttpError, isEmptyDraft, parseDraftInput, parsePeriod, parsePublishInput, publicationIssues, type AdminDraft, type Draft, type DraftFields, type DraftInput, type DraftSummary, type PublicationReceipt, type PublishedRevision, type PublishInput } from "./contracts";
 
 export async function readDraft(db: Database, period: string): Promise<Draft | null> {
   const [row] = await db.select({
     period: monthlyReadDraft.period, titleTr: book.titleTr, titleEn: book.titleEn, author: book.author,
     bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn, version: monthlyReadDraft.version, updatedAt: monthlyReadDraft.updatedAt,
+    receiptRevisionId: monthlyReadPublication.revisionId,
     revisionId: monthlyReadRevision.id, sourceVersion: monthlyReadRevision.sourceVersion, publishedAt: monthlyReadRevision.publishedAt,
   }).from(monthlyReadDraft)
     .innerJoin(book, eq(book.id, monthlyReadDraft.bookId))
     .leftJoin(monthlyReadPublication, eq(monthlyReadPublication.period, monthlyReadDraft.period))
     .leftJoin(monthlyReadRevision, and(eq(monthlyReadRevision.id, monthlyReadPublication.revisionId), eq(monthlyReadRevision.period, monthlyReadPublication.period)))
     .where(eq(monthlyReadDraft.period, parsePeriod(period)));
+  if (row?.receiptRevisionId && (row.revisionId !== row.receiptRevisionId || row.sourceVersion === null || !row.publishedAt)) {
+    throw new Error("Publication receipt snapshot is missing");
+  }
   return row ? {
     titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn,
     period: row.period.slice(0, 7), version: row.version, updatedAt: row.updatedAt.toISOString(),
-    publication: row.revisionId && row.sourceVersion !== null && row.publishedAt ? {
-      revisionId: row.revisionId, sourceVersion: row.sourceVersion, publishedAt: row.publishedAt.toISOString(),
+    publication: row.receiptRevisionId && row.sourceVersion !== null && row.publishedAt ? {
+      revisionId: row.receiptRevisionId, sourceVersion: row.sourceVersion, publishedAt: row.publishedAt.toISOString(),
     } : null,
   } : null;
+}
+
+export async function readDraftSummaries(db: Database): Promise<DraftSummary[]> {
+  const rows = await db.select({
+    period: monthlyReadDraft.period, titleTr: book.titleTr, titleEn: book.titleEn, author: book.author,
+    bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn,
+    version: monthlyReadDraft.version, updatedAt: monthlyReadDraft.updatedAt,
+    revisionId: monthlyReadRevision.id, sourceVersion: monthlyReadRevision.sourceVersion, publishedAt: monthlyReadRevision.publishedAt,
+  }).from(monthlyReadDraft)
+    .innerJoin(book, eq(book.id, monthlyReadDraft.bookId))
+    .leftJoin(monthlyReadPublication, eq(monthlyReadPublication.period, monthlyReadDraft.period))
+    .leftJoin(monthlyReadRevision, and(eq(monthlyReadRevision.id, monthlyReadPublication.revisionId), eq(monthlyReadRevision.period, monthlyReadPublication.period)))
+    .orderBy(desc(monthlyReadDraft.period));
+  return rows.map((row) => {
+    const publication = row.revisionId && row.sourceVersion !== null && row.publishedAt ? {
+      revisionId: row.revisionId, sourceVersion: row.sourceVersion, publishedAt: row.publishedAt.toISOString(),
+    } : null;
+    return {
+      period: row.period.slice(0, 7), titleTr: row.titleTr, titleEn: row.titleEn,
+      version: row.version, updatedAt: row.updatedAt.toISOString(), publication,
+      isEmpty: isEmptyDraft({ titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn }),
+    };
+  });
+}
+
+async function withPublishedSnapshot(db: Database, draft: Draft): Promise<AdminDraft> {
+  const published = draft.publication ? await readPublishedRevision(db, draft.publication.revisionId) : null;
+  if (draft.publication && !published) throw new Error("Published revision missing for publication receipt");
+  return { ...draft, published };
+}
+
+export async function readAdminDraft(db: Database, period: string): Promise<AdminDraft | null> {
+  const draft = await readDraft(db, period);
+  return draft ? withPublishedSnapshot(db, draft) : null;
+}
+
+export async function saveAdminDraft(db: Database, period: string, value: DraftInput): Promise<AdminDraft> {
+  return withPublishedSnapshot(db, await saveDraft(db, period, value));
 }
 
 export async function saveDraft(db: Database, period: string, value: DraftInput): Promise<Draft> {

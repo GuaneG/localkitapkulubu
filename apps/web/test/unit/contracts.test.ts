@@ -14,9 +14,12 @@ test("draft accepts incomplete translations but rejects invalid month/version or
 });
 
 test("publication requires trimmed, non-empty fields while drafts remain editable", async () => {
-  const { publicationIssues, parseDraftInput, parsePublishInput } = await import("../../src/server/monthly-read/contracts.ts");
+  const { isEmptyDraft, publicationIssues, parseDraftInput, parsePublishInput } = await import("../../src/server/monthly-read/contracts.ts");
   const draft = { expectedVersion: null, titleTr: "", titleEn: "  ", author: "", bandTr: "Taslak", bandEn: "" };
   assert.deepEqual(parseDraftInput(draft), draft);
+  assert.equal(isEmptyDraft(draft), false);
+  assert.equal(isEmptyDraft({ titleTr: " \n", titleEn: "\t", author: "", bandTr: " ", bandEn: "" }), true);
+  assert.throws(() => parseDraftInput({ ...draft, bandTr: "  " }), { status: 422 });
   assert.deepEqual(publicationIssues({ titleTr: "", titleEn: "  ", author: "", bandTr: "  ", bandEn: "ok" }), [
     "titleTr", "titleEn", "author", "bandTr",
   ]);

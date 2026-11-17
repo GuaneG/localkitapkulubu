@@ -4,11 +4,17 @@ export type PublicationReceipt = { revisionId: string; sourceVersion: number; pu
 export type Draft = DraftFields & { period: string; version: number; updatedAt: string; publication: PublicationReceipt | null };
 export type PublishInput = { expectedVersion: number };
 export type PublishedRevision = DraftFields & { id: string; period: string; sourceVersion: number; publishedAt: string };
+export type DraftSummary = Pick<Draft, "period" | "titleTr" | "titleEn" | "version" | "updatedAt" | "publication"> & { isEmpty: boolean };
+export type AdminDraft = Draft & { published: PublishedRevision | null };
 export const draftFieldNames: Record<keyof DraftFields, string> = { titleTr: "Kitap adı — TR", titleEn: "Kitap adı — EN", author: "Yazar", bandTr: "Şerit metni — TR", bandEn: "Şerit metni — EN" };
 const fieldLimits = { titleTr: 300, titleEn: 300, author: 300, bandTr: 5000, bandEn: 5000 };
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
+}
+
+export function isEmptyDraft(fields: DraftFields): boolean {
+  return [fields.titleTr, fields.titleEn, fields.author, fields.bandTr, fields.bandEn].every((value) => value.trim().length === 0);
 }
 
 export function parsePeriod(value: string): string {
@@ -25,6 +31,7 @@ export function parseDraftInput(value: unknown): DraftInput {
   }
   const version = input.expectedVersion;
   if (version !== null && (typeof version !== "number" || !Number.isSafeInteger(version) || version < 1 || version >= 2147483647)) throw new HttpError(400, "Taslak sürümü geçersiz.");
+  if (isEmptyDraft(input as DraftFields)) throw new HttpError(422, "En az bir içerik alanı doldurun.");
   return input as DraftInput;
 }
 

@@ -37,6 +37,84 @@ test("PostgreSQL atomically saves drafts, rejects create/version races and rolls
   } finally { await pool.end(); }
 });
 
+test("PostgreSQL lists admin draft summaries and resolves the published snapshot from its receipt", { skip: !process.env.TEST_DATABASE_URL }, async () => {
+  testDatabaseUrl();
+  const { Pool } = await import("pg");
+  const { drizzle } = await import("drizzle-orm/node-postgres");
+  const { migrateDatabase } = await import("../../src/server/db/migrate.ts");
+  const { readDraftSummaries, readAdminDraft, readPublishedReferences, saveDraft, publishDraft } = await import("../../src/server/monthly-read/repository.ts");
+  const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+  const db = drizzle(pool);
+  try {
+    await migrateDatabase(db);
+    await pool.query("TRUNCATE monthly_read_publication, monthly_read_revision, monthly_read_draft, book CASCADE");
+
+    const [legacyBook] = (await pool.query("INSERT INTO book (title_tr, title_en, author) VALUES ('', '', '') RETURNING id")).rows;
+    await pool.query("INSERT INTO monthly_read_draft (period, book_id, band_tr, band_en) VALUES ('2026-10-01', $1, '', '')", [legacyBook.id]);
+    await saveDraft(db, "2026-11", { expectedVersion: null, titleTr: "Kısmi", titleEn: "", author: "", bandTr: "", bandEn: "" });
+
+    const draftA = await saveDraft(db, "2026-12", { expectedVersion: null, titleTr: "Kitap A", titleEn: "Book A", author: "Yazar A", bandTr: "Şerit A", bandEn: "Band A" });
+    const receiptA = await publishDraft(db, "2026-12", { expectedVersion: draftA.version });
+    await saveDraft(db, "2026-12", { expectedVersion: draftA.version, titleTr: "Kitap B", titleEn: "Book B", author: "Yazar B", bandTr: "Şerit B", bandEn: "Band B" });
+
+    const summaries = await readDraftSummaries(db);
+    assert.deepEqual(summaries.map(({ period }) => period), ["2026-12", "2026-11", "2026-10"]);
+    assert.deepEqual(summaries.map(({ isEmpty }) => isEmpty), [false, false, true]);
+    assert.equal(summaries[1].titleTr, "Kısmi");
+    assert.equal(Object.hasOwn(summaries[0], "bandTr"), false);
+    assert.equal(summaries[0].publication?.revisionId, receiptA.revisionId);
+
+    const adminDraft = await readAdminDraft(db, "2026-12");
+    assert.equal(adminDraft?.titleTr, "Kitap B");
+    assert.equal(adminDraft?.published?.id, receiptA.revisionId);
+    assert.equal(adminDraft?.published?.titleTr, "Kitap A");
+
+    let interleaved = false;
+    let racedReceiptId: string | undefined;
+    const interleavingDb = new Proxy(db, {
+      get(target, property) {
+        if (property !== "select") {
+          const value = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return (...args: Parameters<typeof db.select>) => {
+          const query = target.select(...args);
+          const wrap = (builder: typeof query): typeof query => new Proxy(builder, {
+            get(queryTarget, key) {
+              const value = Reflect.get(queryTarget, key, queryTarget);
+              if (key === "then") return (resolve: (result: unknown) => unknown, reject: (reason: unknown) => unknown) =>
+                Promise.resolve(value.call(queryTarget)).then(async (result) => {
+                  if (!interleaved) {
+                    interleaved = true;
+                    racedReceiptId = (await publishDraft(db, "2026-12", { expectedVersion: 2 })).revisionId;
+                  }
+                  return resolve(result);
+                }, reject);
+              if (typeof value === "function") return (...methodArgs: unknown[]) => {
+                const next = value.apply(queryTarget, methodArgs);
+                return next && typeof next === "object" ? wrap(next) : next;
+              };
+              return value;
+            },
+          });
+          return wrap(query);
+        };
+      },
+    });
+    const racedRead = await readAdminDraft(interleavingDb, "2026-12");
+    assert.equal(interleaved, true);
+    assert.equal((await readPublishedReferences(db, "2026-12"))[0].revisionId, racedReceiptId);
+    assert.deepEqual(racedRead?.publication, adminDraft?.publication);
+    assert.equal(racedRead?.published?.id, receiptA.revisionId);
+    assert.equal(racedRead?.published?.titleTr, "Kitap A");
+
+    await pool.query("ALTER TABLE monthly_read_publication DISABLE TRIGGER ALL");
+    try { await pool.query("UPDATE monthly_read_publication SET revision_id = '00000000-0000-4000-8000-000000000000' WHERE period = '2026-12-01'"); }
+    finally { await pool.query("ALTER TABLE monthly_read_publication ENABLE TRIGGER ALL"); }
+    await assert.rejects(readAdminDraft(db, "2026-12"), /Publication receipt snapshot is missing/);
+  } finally { await pool.end(); }
+});
+
 test("PostgreSQL publishes immutable revisions and keeps one period pointer", { skip: !process.env.TEST_DATABASE_URL }, async () => {
   testDatabaseUrl();
   const { Pool } = await import("pg");

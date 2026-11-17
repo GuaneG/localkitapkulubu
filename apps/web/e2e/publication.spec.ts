@@ -77,7 +77,10 @@ test("saved B survives reload while anonymous TR/EN keep A until B is published"
   let previewStyle: { transform: string; spine: string };
   const fields = (name: string) => ({ titleTr: `${marker} ${name} TR title`, titleEn: `${marker} ${name} EN title`, author: `${marker} ${name} author`, bandTr: `${marker} ${name} TR band`, bandEn: `${marker} ${name} EN band` });
   async function fill(values: ReturnType<typeof fields>) {
-    for (const [label, value] of [["Kitap adı — TR", values.titleTr], ["Kitap adı — EN", values.titleEn], ["Yazar", values.author], ["Şerit metni — TR", values.bandTr], ["Şerit metni — EN", values.bandEn]]) await page.getByRole("textbox", { name: label, exact: true }).fill(value);
+    for (const [label, value] of [["Kitap adı — TR", values.titleTr], ["Kitap adı — EN", values.titleEn], ["Yazar", values.author], ["Şerit metni — TR", values.bandTr], ["Şerit metni — EN", values.bandEn]]) {
+      if (label.endsWith("TR") || label.endsWith("EN")) await page.getByRole("tab", { name: label.endsWith("TR") ? "Türkçe" : "İngilizce", exact: true }).click();
+      await page.getByRole("textbox", { name: label, exact: true }).fill(value);
+    }
     const saved = page.waitForResponse((r) => r.url().endsWith(api) && r.request().method() === "PUT");
     await page.getByRole("button", { name: "Taslağı kaydet", exact: true }).click();
     const response = await saved; expect(response.status()).toBe(200);
@@ -128,9 +131,17 @@ test("saved B survives reload while anonymous TR/EN keep A until B is published"
     await page.goto(`${baseURL}/admin/ayin-kitabi?ay=${period}`);
     const savedB = await fill(b);
     await page.reload();
-    for (const [label, value] of [["Kitap adı — TR", b.titleTr], ["Kitap adı — EN", b.titleEn], ["Yazar", b.author], ["Şerit metni — TR", b.bandTr], ["Şerit metni — EN", b.bandEn]]) await expect(page.getByRole("textbox", { name: label, exact: true })).toHaveValue(value);
-    await expect(page.getByText(new RegExp(`Sürüm ${savedB.version} · Son kayıt`))).toBeVisible();
+    for (const [label, value] of [["Kitap adı — TR", b.titleTr], ["Kitap adı — EN", b.titleEn], ["Yazar", b.author], ["Şerit metni — TR", b.bandTr], ["Şerit metni — EN", b.bandEn]]) {
+      if (label.endsWith("TR") || label.endsWith("EN")) await page.getByRole("tab", { name: label.endsWith("TR") ? "Türkçe" : "İngilizce", exact: true }).click();
+      await expect(page.getByRole("textbox", { name: label, exact: true })).toHaveValue(value);
+    }
+    await expect(page.locator("[data-saved-version]")).toHaveAttribute("data-saved-version", String(savedB.version));
     const persisted = await admin.request.get(`${baseURL}${api}`); expect((await persisted.json()).version).toBe(savedB.version);
+    await page.getByRole("tab", { name: "Bu ayın yayını", exact: true }).click();
+    await expect(page.getByRole("region", { name: "İçerik önizlemesi" })).toContainText(a.bandEn);
+    await expect(page.getByRole("region", { name: "İçerik önizlemesi" })).not.toContainText(`${marker} B`);
+    await page.getByRole("tab", { name: "Son kayıt", exact: true }).click();
+    await expect(page.getByRole("region", { name: "İçerik önizlemesi" })).toContainText(b.bandEn);
     for (const locale of ["tr", "en"] as const) {
       await page.goto(`${baseURL}/admin/ayin-kitabi/onizleme?ay=${period}&dil=${locale}`);
       await expect(page.locator(".read-band")).toContainText(locale === "tr" ? b.bandTr : b.bandEn);
@@ -150,7 +161,7 @@ test("saved B survives reload while anonymous TR/EN keep A until B is published"
     await page.unroute(`**${api}/yayin`);
     await publicVersion(b, `${marker} A`);
     await page.reload();
-    await expect(page.getByText(`Son yayın · Sürüm ${savedB.version}`, { exact: false })).toBeVisible();
+    await expect(page.locator("[data-published-version]")).toHaveAttribute("data-published-version", String(savedB.version));
     const repeated = await Promise.all([0, 1].map(() => admin.request.post(`${baseURL}${api}/yayin`, { headers: { origin: baseURL! }, data: { expectedVersion: savedB.version } })));
     for (const response of repeated) { expect(response.status()).toBe(200); expect((await response.json()).revisionId).toBe(receiptB?.revisionId); }
     expect(receiptB?.revisionId).not.toBe(receiptA.revisionId);
