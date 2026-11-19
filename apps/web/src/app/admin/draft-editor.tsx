@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, useSyncExternalStore, type MouseEvent } from "react";
-import { draftFieldNames as names, isEmptyDraft, type AdminDraft, type DraftFields, type DraftSummary } from "@/server/monthly-read/contracts";
+import { draftFieldNames as names, isEmptyDraft, parseReadingNumber, type AdminDraft, type DraftFields, type DraftTextFields, type DraftSummary } from "@/server/monthly-read/contracts";
 import type { Locale } from "@/lib/i18n";
 import { MonthlyReadBand } from "@/components/monthly-read-band";
 import { AdminPageHeader } from "./components/admin-page-header";
@@ -13,9 +13,11 @@ import { periodLabel, previewRead, savedAt } from "./presentation";
 import { navigateAdmin, signOutAdmin } from "./client-actions";
 import styles from "./admin.module.css";
 
-function fields(draft: DraftFields | null): DraftFields {
+function fields(draft: DraftFields | null): DraftTextFields {
   return { titleTr: draft?.titleTr || "", titleEn: draft?.titleEn || "", author: draft?.author || "", bandTr: draft?.bandTr || "", bandEn: draft?.bandEn || "" };
 }
+function numberText(draft: DraftFields | null) { return draft?.readingNumber == null ? "" : String(draft.readingNumber); }
+function formNumber(text: string) { return parseReadingNumber(text.trim() === "" ? null : Number(text)) ?? null; }
 function summary(draft: AdminDraft): DraftSummary {
   return { period: draft.period, titleTr: draft.titleTr, titleEn: draft.titleEn, version: draft.version, updatedAt: draft.updatedAt, publication: draft.publication, isEmpty: isEmptyDraft(draft) };
 }
@@ -30,6 +32,7 @@ export function DraftEditor({ period, initial, initialSummaries, listError }: { 
   // SSR fields must not accept input before React attaches their handlers.
   const ready = useSyncExternalStore(subscribeReady, clientReady, serverReady);
   const [saved, setSaved] = useState(initial), [value, setValue] = useState(() => fields(initial));
+  const [readingNumber, setReadingNumber] = useState(() => numberText(initial));
   const [summaries, setSummaries] = useState(initialSummaries);
   const [selectedMonth, setSelectedMonth] = useState(period);
   const [locale, setLocale] = useState<Locale>("tr"), [view, setView] = useState<View>("live");
@@ -37,7 +40,7 @@ export function DraftEditor({ period, initial, initialSummaries, listError }: { 
   const [busy, setBusy] = useState(false), [message, setMessage] = useState(""), [error, setError] = useState("");
   const [latest, setLatest] = useState<AdminDraft | null>(null);
   const skipWarning = useRef(false), sending = useRef(false), monthRef = useRef<HTMLInputElement>(null);
-  const dirty = JSON.stringify(value) !== JSON.stringify(fields(saved));
+  const dirty = JSON.stringify(value) !== JSON.stringify(fields(saved)) || readingNumber !== numberText(saved);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty && !skipWarning.current) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", warn);
@@ -48,18 +51,21 @@ export function DraftEditor({ period, initial, initialSummaries, listError }: { 
     skipWarning.current = true; navigateAdmin(url);
   }
   function follow(event: MouseEvent<HTMLAnchorElement>, url: string) { event.preventDefault(); leave(url); }
-  function change(key: keyof DraftFields, next: string) { setValue((old) => ({ ...old, [key]: next })); setView("live"); setMessage(""); }
+  function change(key: keyof DraftTextFields, next: string) { setValue((old) => ({ ...old, [key]: next })); setView("live"); setMessage(""); }
   function remember(draft: AdminDraft) {
-    setSaved(draft); setValue(fields(draft));
+    setSaved(draft); setValue(fields(draft)); setReadingNumber(numberText(draft));
     setSummaries((old) => [summary(draft), ...old.filter((row) => row.period !== draft.period)].sort((a, b) => b.period.localeCompare(a.period)));
   }
   async function save() {
     if (sending.current) return;
     setError(""); setMessage("");
-    if (isEmptyDraft(value)) { setError("Taslağı kaydetmek için kitap adı, yazar veya şerit alanlarından en az birini doldurun."); return; }
+    let payload: DraftFields;
+    try { payload = { ...value, readingNumber: formNumber(readingNumber) }; }
+    catch { setError("Okuma numarası 1 ile 2147483647 arasında bir tam sayı olmalıdır. Alanı boş bırakabilirsiniz."); return; }
+    if (isEmptyDraft(payload)) { setError("Taslağı kaydetmek için okuma numarası, kitap adı, yazar veya şerit alanlarından en az birini doldurun."); return; }
     sending.current = true; setBusy(true); setLatest(null);
     try {
-      const response = await fetch(`/api/admin/ayin-kitabi/${period}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...value, expectedVersion: saved?.version ?? null }) });
+      const response = await fetch(`/api/admin/ayin-kitabi/${period}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...payload, expectedVersion: saved?.version ?? null }) });
       if (response.ok) { remember(await response.json()); setMessage("Taslak kaydedildi. Yayındaki içerik değişmedi."); }
       else if (response.status === 401) setError("Oturumunuz sona erdi. Ayrı sekmede yeniden giriş yapın. Metniniz korundu.");
       else if (response.status === 409) {
@@ -77,7 +83,9 @@ export function DraftEditor({ period, initial, initialSummaries, listError }: { 
     try { await signOutAdmin(); skipWarning.current = true; navigateAdmin("/admin/giris"); }
     catch { setError("Çıkış yapılamadı. Metniniz korundu."); setBusy(false); }
   }
-  const source = view === "live" ? value : view === "saved" ? saved : saved?.published;
+  let liveNumber: number | null = null;
+  try { liveNumber = formNumber(readingNumber); } catch { /* Invalid input is never rendered as a published number. */ }
+  const source = view === "live" ? { ...value, readingNumber: liveNumber } : view === "saved" ? saved : saved?.published;
   const preview = source ? previewRead(source, period, locale) : null;
   const previewCaption = view === "live" ? dirty ? "Henüz kaydedilmedi" : saved ? "Son kayıtla aynı" : "Henüz kayıt yok" : view === "saved" ? saved ? `Son kayıt: ${savedAt(saved.updatedAt)}` : "Bu ay için henüz kaydedilmiş taslak yok." : saved?.published ? `Bu aya ait yayın: ${savedAt(saved.published.publishedAt)}` : "Bu ay henüz yayınlanmadı.";
   return <div className={styles.editor} data-saved-version={saved?.version ?? ""}>
@@ -105,6 +113,8 @@ export function DraftEditor({ period, initial, initialSummaries, listError }: { 
         <div className={`${styles.editGrid} ${expanded ? styles.expanded : ""}`}>
           <form id="draft-form" hidden={expanded} onSubmit={(event) => { event.preventDefault(); void save(); }}>
             <fieldset disabled={busy || !ready}>
+              <AdminField id="reading-number" label="Okuma numarası" type="number" inputMode="numeric" min={1} max={2147483647} step={1} aria-describedby="reading-number-help" value={readingNumber} onChange={(event) => { setReadingNumber(event.target.value); setView("live"); setMessage(""); }} />
+              <p id="reading-number-help" className={styles.caption}>İsteğe bağlı. Yalnız numarayı yazın (ör. 38). Boş bırakırsanız başlık numarasız görünür.</p>
               <AdminField id="author" label={names.author} value={value.author} maxLength={300} onChange={(event) => change("author", event.target.value)} />
               <AdminTabs id="language" label="İçerik dili" items={languages} value={locale} onChange={setLocale} />
               {languages.map((language) => <section key={language.value} role="tabpanel" id={`language-${language.value}-panel`} aria-labelledby={`language-${language.value}-tab`} hidden={locale !== language.value}>
@@ -133,7 +143,7 @@ export function DraftEditor({ period, initial, initialSummaries, listError }: { 
         <AdminNotice kind="success">{message}</AdminNotice>
         {error && <AdminNotice kind="error"><p>{error}</p><a href="/admin/giris" target="_blank" rel="noopener noreferrer">Ayrı sekmede giriş yap</a></AdminNotice>}
         {latest && <aside className={styles.conflict}><h2>Son kayıt</h2><p>Formunuz yukarıda korunuyor. Gerekirse metninizi kopyalayın; son kayıt aşağıdadır.</p>
-          <dl>{(Object.keys(names) as (keyof DraftFields)[]).map((key) => <div key={key}><dt>{names[key]}</dt><dd>{latest[key] || "Boş"}</dd></div>)}</dl>
+          <dl><div><dt>Okuma numarası</dt><dd>{latest.readingNumber ?? "Boş"}</dd></div>{(Object.keys(names) as (keyof DraftTextFields)[]).map((key) => <div key={key}><dt>{names[key]}</dt><dd>{latest[key] || "Boş"}</dd></div>)}</dl>
           <AdminButton disabled={busy} onClick={() => { if (window.confirm("Formdaki değişiklikler silinip son kayıt yüklenecek. Devam edilsin mi?")) { remember(latest); setLatest(null); setError(""); } }}>Son kaydı yükle</AdminButton>
         </aside>}
       </div>

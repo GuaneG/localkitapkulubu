@@ -1,0 +1,4 @@
+ALTER TABLE "monthly_read_draft" ADD COLUMN "reading_number" integer;--> statement-breakpoint
+ALTER TABLE "monthly_read_revision" ADD COLUMN "reading_number" integer;--> statement-breakpoint
+ALTER TABLE "monthly_read_draft" ADD CONSTRAINT "monthly_read_draft_reading_number_positive" CHECK ("monthly_read_draft"."reading_number" IS NULL OR "monthly_read_draft"."reading_number" > 0);--> statement-breakpoint
+ALTER TABLE "monthly_read_revision" ADD CONSTRAINT "monthly_read_revision_reading_number_positive" CHECK ("monthly_read_revision"."reading_number" IS NULL OR "monthly_read_revision"."reading_number" > 0);

@@ -1,7 +1,7 @@
 import type { Locale } from "../../lib/i18n";
 import type { PublishedRevision } from "./contracts";
 
-export type PublicRead = { revisionId: string; period: string; title: string; author: string; band: string };
+export type PublicRead = { revisionId: string; period: string; title: string; author: string; band: string; readingNumber?: number | null };
 export type PublishedHome = { current: PublicRead | null; past: PublicRead[] };
 type References = Array<{ period: string; revisionId: string }>;
 type ReadRevision = (id: string) => Promise<PublishedRevision | null>;
@@ -24,7 +24,7 @@ export async function loadPublishedHome(locale: Locale, now: Date, reads: { read
   const records = await Promise.all(refs.map(async (ref): Promise<PublicRead> => {
     const revision = await reads.readRevision(ref.revisionId);
     if (!revision || revision.id !== ref.revisionId || revision.period !== ref.period) throw new Error("Published revision does not match its reference");
-    return { revisionId: revision.id, period: revision.period, title: locale === "tr" ? revision.titleTr : revision.titleEn, author: revision.author, band: locale === "tr" ? revision.bandTr : revision.bandEn };
+    return { revisionId: revision.id, period: revision.period, title: locale === "tr" ? revision.titleTr : revision.titleEn, author: revision.author, band: locale === "tr" ? revision.bandTr : revision.bandEn, readingNumber: revision.readingNumber ?? null };
   }));
   return { current: records.find((read) => read.period === period) ?? null, past: records.filter((read) => read.period < period) };
 }

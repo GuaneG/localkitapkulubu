@@ -25,17 +25,18 @@ export const book = pgTable("book", {
 });
 export const monthlyReadDraft = pgTable("monthly_read_draft", {
   id: uuid().primaryKey().defaultRandom(), period: date().notNull().unique(), bookId: uuid("book_id").notNull().references(() => book.id, { onDelete: "restrict" }),
-  bandTr: text("band_tr").notNull(), bandEn: text("band_en").notNull(), version: integer().notNull().default(1), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (t) => [check("period_first_day", sql`extract(day from ${t.period}) = 1`), check("positive_version", sql`${t.version} > 0`)]);
+  bandTr: text("band_tr").notNull(), bandEn: text("band_en").notNull(), readingNumber: integer("reading_number"), version: integer().notNull().default(1), updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [check("period_first_day", sql`extract(day from ${t.period}) = 1`), check("positive_version", sql`${t.version} > 0`), check("monthly_read_draft_reading_number_positive", sql`${t.readingNumber} IS NULL OR ${t.readingNumber} > 0`)]);
 export const monthlyReadRevision = pgTable("monthly_read_revision", {
   id: uuid().primaryKey().defaultRandom(), draftId: uuid("draft_id").notNull().references(() => monthlyReadDraft.id, { onDelete: "restrict" }), period: date().notNull(),
   sourceVersion: integer("source_version").notNull(), titleTr: text("title_tr").notNull(), titleEn: text("title_en").notNull(), author: text().notNull(),
-  bandTr: text("band_tr").notNull(), bandEn: text("band_en").notNull(), publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
+  bandTr: text("band_tr").notNull(), bandEn: text("band_en").notNull(), readingNumber: integer("reading_number"), publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique("monthly_read_revision_draft_source_unique").on(t.draftId, t.sourceVersion),
   unique("monthly_read_revision_period_id_unique").on(t.period, t.id),
   check("monthly_read_revision_period_first_day", sql`extract(day from ${t.period}) = 1`),
   check("monthly_read_revision_positive_source_version", sql`${t.sourceVersion} > 0`),
+  check("monthly_read_revision_reading_number_positive", sql`${t.readingNumber} IS NULL OR ${t.readingNumber} > 0`),
 ]);
 export const monthlyReadPublication = pgTable("monthly_read_publication", {
   period: date().primaryKey(), revisionId: uuid("revision_id").notNull(),

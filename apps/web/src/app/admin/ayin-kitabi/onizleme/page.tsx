@@ -1,7 +1,7 @@
 import { loadDraft } from "../../load-draft";
 import styles from "../../admin.module.css";
 import { MonthlyReadBand } from "@/components/monthly-read-band";
-import { isEmptyDraft, publicationIssues, draftFieldNames, type DraftFields } from "@/server/monthly-read/contracts";
+import { isEmptyDraft, publicationIssues, draftFieldNames, type DraftTextFields } from "@/server/monthly-read/contracts";
 import { PublishButton } from "../../publish-button";
 import { AdminPageHeader } from "../../components/admin-page-header";
 import { AdminNotice } from "../../components/admin-notice";
@@ -22,7 +22,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     {!result.draft ? <p>Bu ay için henüz kaydedilmiş taslak yok.</p> : <>
       <p>Son kayıt: {savedAt(result.draft.updatedAt)} · <DraftStatus draft={{ ...result.draft, isEmpty: isEmptyDraft(result.draft) }} /></p>
       <MonthlyReadBand locale={locale} read={previewRead(result.draft, period, locale)} />
-      {issues.length > 0 && <AdminNotice><p>Yayın için tamamlanması gereken alanlar:</p><ul>{issues.map((field) => <li key={field}>{draftFieldNames[field as keyof DraftFields]}</li>)}</ul></AdminNotice>}
+      {issues.length > 0 && <AdminNotice><p>Yayın için tamamlanması gereken alanlar:</p><ul>{issues.map((field) => <li key={field}>{draftFieldNames[field as keyof DraftTextFields]}</li>)}</ul></AdminNotice>}
       <PublishButton key={result.draft.version} period={period} version={result.draft.version} publication={result.draft.publication} disabled={issues.length > 0} />
     </>}
   </div>;

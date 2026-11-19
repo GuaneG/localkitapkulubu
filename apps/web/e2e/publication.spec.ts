@@ -52,6 +52,7 @@ test("publication checks admin/origin, bilingual fields and the previewed saved 
     expect(blocked.status()).toBe(422); expect(blocked.headers()["cache-control"]).toContain("no-store");
     const page = await admin.newPage();
     await page.goto(`${baseURL}/admin/ayin-kitabi/onizleme?ay=2090-01`);
+    await expect(page.getByRole("heading", { name: "Read of the month", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Yayınla", exact: true })).toBeDisabled();
     const complete = { ...incomplete, titleEn: "English", bandEn: "English band" };
     const next = await (await admin.request.put(`${baseURL}${endpoint}`, { headers, data: { ...complete, expectedVersion: saved.version } })).json();
@@ -75,11 +76,17 @@ test("saved B survives reload while anonymous TR/EN keep A until B is published"
   const api = `/api/admin/ayin-kitabi/${period}`;
   const preview = `/admin/ayin-kitabi/onizleme?ay=${period}&dil=tr`;
   let previewStyle: { transform: string; spine: string };
-  const fields = (name: string) => ({ titleTr: `${marker} ${name} TR title`, titleEn: `${marker} ${name} EN title`, author: `${marker} ${name} author`, bandTr: `${marker} ${name} TR band`, bandEn: `${marker} ${name} EN band` });
+  const fields = (name: string) => ({ readingNumber: name === "A" ? 38 : 39, titleTr: `${marker} ${name} TR title`, titleEn: `${marker} ${name} EN title`, author: `${marker} ${name} author`, bandTr: `${marker} ${name} TR band`, bandEn: `${marker} ${name} EN band` });
   async function fill(values: ReturnType<typeof fields>) {
+    await expect(page.getByLabel("Okuma numarası", { exact: true })).toHaveCount(1);
+    await page.getByLabel("Okuma numarası", { exact: true }).fill(String(values.readingNumber));
     for (const [label, value] of [["Kitap adı — TR", values.titleTr], ["Kitap adı — EN", values.titleEn], ["Yazar", values.author], ["Şerit metni — TR", values.bandTr], ["Şerit metni — EN", values.bandEn]]) {
       if (label.endsWith("TR") || label.endsWith("EN")) await page.getByRole("tab", { name: label.endsWith("TR") ? "Türkçe" : "İngilizce", exact: true }).click();
       await page.getByRole("textbox", { name: label, exact: true }).fill(value);
+    }
+    for (const language of ["Türkçe", "İngilizce"]) {
+      await page.getByRole("tab", { name: language, exact: true }).click();
+      await expect(page.getByRole("region", { name: "İçerik önizlemesi" }).getByRole("heading", { name: `Read of the month #${values.readingNumber}`, exact: true })).toBeVisible();
     }
     const saved = page.waitForResponse((r) => r.url().endsWith(api) && r.request().method() === "PUT");
     await page.getByRole("button", { name: "Taslağı kaydet", exact: true }).click();
@@ -96,6 +103,7 @@ test("saved B survives reload while anonymous TR/EN keep A until B is published"
         const response = await visitor.goto(`${baseURL}/${locale}`);
         expect(response?.status()).toBe(200);
         expect(response?.headers()["cache-control"]).toContain("no-store");
+        await expect(visitor.locator(".read-band").getByRole("heading", { name: `Read of the month #${values.readingNumber}`, exact: true })).toBeVisible();
         await expect(visitor.locator(".read-band")).toContainText(locale === "tr" ? values.bandTr : values.bandEn);
         await expect(visitor.locator(".read-band")).toContainText(locale === "tr" ? values.titleTr : values.titleEn);
         const publicStyle = await visitor.locator(".read-band .book-cover").locator("..").evaluate((element) => ({ transform: getComputedStyle(element).transform, spine: getComputedStyle(element, "::before").content }));
@@ -119,7 +127,7 @@ test("saved B survives reload while anonymous TR/EN keep A until B is published"
     const a = fields("A"); const b = fields("B");
     const savedA = await fill(a);
     await page.goto(`${baseURL}${preview}`);
-    await expect(page.getByRole("heading", { name: "Read of the month", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Read of the month #38", exact: true })).toBeVisible();
     previewStyle = await page.locator(".read-band .book-cover").locator("..").evaluate((element) => ({ transform: getComputedStyle(element).transform, spine: getComputedStyle(element, "::before").content }));
     const publishA = page.waitForResponse((r) => r.url().endsWith(`${api}/yayin`) && r.request().method() === "POST");
     await page.getByRole("button", { name: "Yayınla", exact: true }).click();
@@ -128,23 +136,40 @@ test("saved B survives reload while anonymous TR/EN keep A until B is published"
     await expect(page.getByRole("status")).toContainText("Yayınlandı");
     await publicVersion(a, `${marker} B`);
 
+    // Invalid values cannot change the persisted draft or published revision.
+    for (const readingNumber of [0, -1, 1.5, 2147483648, "38", true, [], {}]) {
+      const invalid = await admin.request.put(`${baseURL}${api}`, { headers: { origin: baseURL! }, data: { ...a, readingNumber, expectedVersion: savedA.version } });
+      expect(invalid.status()).toBe(400);
+    }
     await page.goto(`${baseURL}/admin/ayin-kitabi?ay=${period}`);
+    for (const invalid of ["0", "-1", "1.5"]) {
+      await page.getByLabel("Okuma numarası", { exact: true }).fill(invalid);
+      await page.getByRole("button", { name: "Taslağı kaydet", exact: true }).click();
+      expect(await page.getByLabel("Okuma numarası", { exact: true }).evaluate((node: HTMLInputElement) => node.validity.valid)).toBe(false);
+      const current = await (await admin.request.get(`${baseURL}${api}`)).json();
+      expect(current.version).toBe(savedA.version); expect(current.readingNumber).toBe(38);
+    }
     const savedB = await fill(b);
     await page.reload();
+    await expect(page.getByLabel("Okuma numarası", { exact: true })).toHaveValue("39");
     for (const [label, value] of [["Kitap adı — TR", b.titleTr], ["Kitap adı — EN", b.titleEn], ["Yazar", b.author], ["Şerit metni — TR", b.bandTr], ["Şerit metni — EN", b.bandEn]]) {
       if (label.endsWith("TR") || label.endsWith("EN")) await page.getByRole("tab", { name: label.endsWith("TR") ? "Türkçe" : "İngilizce", exact: true }).click();
       await expect(page.getByRole("textbox", { name: label, exact: true })).toHaveValue(value);
     }
     await expect(page.locator("[data-saved-version]")).toHaveAttribute("data-saved-version", String(savedB.version));
-    const persisted = await admin.request.get(`${baseURL}${api}`); expect((await persisted.json()).version).toBe(savedB.version);
+    const persisted = await admin.request.get(`${baseURL}${api}`); const persistedDraft = await persisted.json();
+    expect(persistedDraft.version).toBe(savedB.version); expect(persistedDraft.readingNumber).toBe(39);
+    expect(persistedDraft.published.readingNumber).toBe(38);
     await page.getByRole("tab", { name: "Bu ayın yayını", exact: true }).click();
     await expect(page.getByRole("region", { name: "İçerik önizlemesi" })).toContainText(a.bandEn);
+    await expect(page.getByRole("region", { name: "İçerik önizlemesi" }).getByRole("heading", { name: "Read of the month #38", exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "İçerik önizlemesi" })).not.toContainText(`${marker} B`);
     await page.getByRole("tab", { name: "Son kayıt", exact: true }).click();
     await expect(page.getByRole("region", { name: "İçerik önizlemesi" })).toContainText(b.bandEn);
     for (const locale of ["tr", "en"] as const) {
       await page.goto(`${baseURL}/admin/ayin-kitabi/onizleme?ay=${period}&dil=${locale}`);
       await expect(page.locator(".read-band")).toContainText(locale === "tr" ? b.bandTr : b.bandEn);
+      await expect(page.getByRole("heading", { name: "Read of the month #39", exact: true })).toBeVisible();
     }
     await publicVersion(a, `${marker} B`);
     const stale = await admin.request.post(`${baseURL}${api}/yayin`, { headers: { origin: baseURL! }, data: { expectedVersion: savedA.version } });

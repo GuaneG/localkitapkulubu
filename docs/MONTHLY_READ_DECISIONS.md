@@ -1,13 +1,13 @@
 # Ayın Kitabı — paylaşılabilir karar ve kabul özeti
 
-16 Kasım 2026. Bu belge admin, taslak ve yayınlama tesliminin depoda paylaşılabilir dayanağıdır. Kişisel iletişim adresleri, hesap sırları ve ham oturum notları bu özete dahil değildir.
+17 Kasım 2026. Bu belge admin, taslak ve yayınlama tesliminin depoda paylaşılabilir dayanağıdır. Kişisel iletişim adresleri, hesap sırları ve ham oturum notları bu özete dahil değildir. İlk yayın kabulünün tarihsel sonuçları aşağıdadır; güncel okuma numarası ek teslimi [ayrı kayıttadır](READING_NUMBER_DELIVERY.md).
 
 ## İçerik ve yayın kuralları
 
 - Tek ortak, tam yetkili admin hesabı; public kayıt, ziyaretçi hesabı ve parola kurtarma bu kapsamda yok. Gerçek hesap adresi/parolası yalnız özel ortam ayarlarında tutulur.
 - Ay başına tek taslak; eksik TR/EN çeviriler taslak olarak kaydedilebilir. Yayın için iki dilde kitap adı ve şerit metni, ortak yazar ve dahili okuma ayı zorunludur. Başlıkların iki dilde aynı olması mümkündür.
 - Kaydetmek yayınlamak değildir. Kaydedilmiş taslak yalnız yetkili önizlemede görünür; yayın sonrasında taslağı düzenlemek ziyaretçinin son yayınını değiştirmez.
-- Kapak yer tutucusu ve numarasız başlık kabul edilmiştir. Gerçek kapak yükleme, okuma numarası yönetimi ve kimlikle kitap seçimi/aynı kitabı başka aya atamama kontrolü sonraki işlerdir.
+- Kapak yer tutucusu korunur. 17 Kasım kullanıcı kararıyla ilk yayındaki sürekli numarasız başlık kararı değişti: isteğe bağlı ortak numara PO tarafından elle girilir; NULL eski kayıt numarasız görünür. Taslak ve yayın ayrı numara saklar. Gerçek kapak yükleme, numara otomasyonu ve kimlikle kitap seçimi/aynı kitabı başka aya atamama kontrolü sonraki işlerdir.
 - Güncel ay `Europe/Istanbul` ile seçilir. O ayın yayını yoksa açıklanmamış, bağlantısız görünüm kullanılır; önceki kitap güncel yerine gösterilmez ve gelecek ayın yayını erken görünmez. Tam gece yarısı/yıl geçişi kabulü ayrı iştir.
 
 ## Mimari ve ödünleşimler
@@ -38,4 +38,4 @@ Ayrıntılı test ortamı, inceleme bulguları ve kullanım: [yayın teslimi](MO
 
 ## Sonraki işler
 
-Gerçek PO içeriği ve işletim hesabı, canlı hizmet doğrulaması, tam ay/yıl geçişi, gerçek kapak/numara, kitap seçimi/tekrar atama, mail/ziyaretçi formları ve kalan tasarım çalışmaları açık. Bu teslim için yeni PO kararı gerekmedi. Kişisel adresli yerel karar/oturum belgeleri ve paylaşım PDF'si bu commit kapsamına alınmaz; bu özet onlara bağımlı bağlantı içermez.
+Gerçek PO içeriği ve işletim hesabı, canlı hizmet doğrulaması, tam ay/yıl geçişi, gerçek kapak, numara otomasyonu, kitap seçimi/tekrar atama, mail/ziyaretçi formları ve kalan tasarım çalışmaları açık. Elle numara girişi uygulandı; yeni PO kararı gerekmedi. Kişisel adresli yerel karar/oturum belgeleri ve paylaşım PDF'si paylaşılabilir kapsamın dışındadır; bu özet onlara bağımlı bağlantı içermez.

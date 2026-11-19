@@ -15,6 +15,13 @@
       "when": 1794848400000,
       "tag": "0001_monthly_read_publication",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794946777549,
+      "tag": "0002_reading_number",
+      "breakpoints": true
     }
   ]
 }

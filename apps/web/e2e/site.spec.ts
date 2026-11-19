@@ -26,7 +26,7 @@ test("home is server-rendered, covers are static and the shelf scrolls", async (
   expect(response.ok()).toBeTruthy();
   expect(await response.text()).toContain("Birlikte okuduklarımız");
   await page.goto("/tr");
-  await expect(page.getByRole("heading", { name: "Read of the month", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Read of the month(?: #[1-9]\d*)?$/ })).toBeVisible();
   await expect(page.locator(".read-band a, .shelf-book a, .shelf-book button")).toHaveCount(0);
   const track = page.locator(".shelf-track");
   await page.getByRole("button", { name: "Daha önce okunan kitapları göster" }).click();

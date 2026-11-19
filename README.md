@@ -8,6 +8,10 @@ LOCAL. tek bir Next.js uygulaması olarak `apps/web` içinde çalışır. Ortak 
 
 17 Kasım admin arayüzü: giriş sonrası `/admin` ana menüsü; kayıtlı ay listesi, TR/EN sekmeli alanlar ve gerçek site şeridiyle anlık önizleme uygulanmıştır. Tamamen boş taslak reddedilir, kısmi içerik kaydedilebilir. Kullanım, kalıcı tasarım standardı, ortak bileşenler ve [yerel kabul sonuçları admin kılavuzundadır](docs/ADMIN_GUIDE.md#yerel-kabul--17-kasım-2026). Netlify/Neon ortamında yeni arayüzün kabulü ayrıca açıktır.
 
+17 Kasım okuma numarası: editörde ortak isteğe bağlı sayı, anlık önizleme ve değişmez yayın kopyası desteklenir. 38 yayındayken 39 taslağı ziyaretçiye sızmaz. **Yeni kodun Netlify deploy’undan önce [0002_reading_number migration’ı](apps/web/drizzle/0002_reading_number.sql) hedef DB’ye uygulanmalıdır.** Bu tur yalnız ayrı yerel test DB’lerinde uygulanmıştır; [kullanım, kabul ve ortam sınırları](docs/READING_NUMBER_DELIVERY.md).
+
+19 Kasım işletim güncellemesi. 0002 migration’ı Neon `staging` deneme veritabanına uygulandı, iki tablo kolonu ve pozitif kısıtları doğrulandı. Netlify’daki yeni kod ve tarayıcı kabulü ayrıca bekliyor. [Migration kabul kaydı](docs/READING_NUMBER_DELIVERY.md#19-kasım--neon-deneme-veritabanı-migration-kabulü)
+
 Node 24.x ve pnpm 11.25.0 gerekir. Repo kökünde:
 
 ```powershell
@@ -39,11 +43,11 @@ Neon’un Frankfurt projesinde yerel uygulama `staging` dalına bağlı. Havuzlu
 
 ## Mevcut kapsam
 
-Ana sayfa, About/Goodies, görünür metinsiz galeri ve albümler, Contact; gerçek TR/EN adresleri, kitap şeridi, klavye destekli fotoğraf büyütme ve gerçek footer bağlantıları var. Home yayımlanmış kitap/şerit içeriğini DB'den okur; kapak yer tutucudur, başlık numarasızdır. Diğer içerikler temsili; formlar kayıt yapmaz veya e-posta göndermez ve bunu işlemden önce belirtir. Hazırlık sürümü `noindex,nofollow` kullanır.
+Ana sayfa, About/Goodies, görünür metinsiz galeri ve albümler, Contact; gerçek TR/EN adresleri, kitap şeridi, klavye destekli fotoğraf büyütme ve gerçek footer bağlantıları var. Home yayımlanmış kitap/şerit içeriğini DB'den okur; kapak yer tutucudur. Başlık yayınlanan numara varsa `Read of the month #38`, yoksa `Read of the month` gösterir. Diğer içerikler temsili; formlar kayıt yapmaz veya e-posta göndermez ve bunu işlemden önce belirtir. Hazırlık sürümü `noindex,nofollow` kullanır.
 
 Yalnızca LOCAL. logosu Futura PT Condensed Medium / **#89667C**; diğer metinler Courier New Regular, bülten başlığı Bold. Adobe kitindeki gerçek Medium 500 yüzü kontrol/ekleme işi sürer; ZIP kullanılmaz. Bülten dışı şeritler **#BF7CAB**, bülten **#A31B3D**, metinler siyah. Masaüstü görünüm korundu; mobil fallback son mobil tasarım değildir, animasyon seçimi açık.
 
-Kitap kapakları tıklanmaz; puanlama, arşiv, takvim ve kitap detay sayfaları yok. `#38`, 38. okunan kitabın temsili numarasıdır; otomatik artış yöntemi henüz seçilmedi. Bilinmeyen/kaldırılmış adresler HTTP 404 döndürür.
+Kitap kapakları tıklanmaz; puanlama, arşiv, takvim ve kitap detay sayfaları yok. `#38`, 38. okunan kitabı temsil eder; ilk gerçek taslağa PO girer. Numara elle düzenlenir, otomatik artış kapsam dışıdır. Bilinmeyen/kaldırılmış adresler HTTP 404 döndürür.
 
 ## Yapı ve seçilen araçlar
 

@@ -7,7 +7,7 @@ import { HttpError, isEmptyDraft, parseDraftInput, parsePeriod, parsePublishInpu
 export async function readDraft(db: Database, period: string): Promise<Draft | null> {
   const [row] = await db.select({
     period: monthlyReadDraft.period, titleTr: book.titleTr, titleEn: book.titleEn, author: book.author,
-    bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn, version: monthlyReadDraft.version, updatedAt: monthlyReadDraft.updatedAt,
+    bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn, readingNumber: monthlyReadDraft.readingNumber, version: monthlyReadDraft.version, updatedAt: monthlyReadDraft.updatedAt,
     receiptRevisionId: monthlyReadPublication.revisionId,
     revisionId: monthlyReadRevision.id, sourceVersion: monthlyReadRevision.sourceVersion, publishedAt: monthlyReadRevision.publishedAt,
   }).from(monthlyReadDraft)
@@ -19,7 +19,7 @@ export async function readDraft(db: Database, period: string): Promise<Draft | n
     throw new Error("Publication receipt snapshot is missing");
   }
   return row ? {
-    titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn,
+    titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn, readingNumber: row.readingNumber,
     period: row.period.slice(0, 7), version: row.version, updatedAt: row.updatedAt.toISOString(),
     publication: row.receiptRevisionId && row.sourceVersion !== null && row.publishedAt ? {
       revisionId: row.receiptRevisionId, sourceVersion: row.sourceVersion, publishedAt: row.publishedAt.toISOString(),
@@ -30,7 +30,7 @@ export async function readDraft(db: Database, period: string): Promise<Draft | n
 export async function readDraftSummaries(db: Database): Promise<DraftSummary[]> {
   const rows = await db.select({
     period: monthlyReadDraft.period, titleTr: book.titleTr, titleEn: book.titleEn, author: book.author,
-    bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn,
+    bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn, readingNumber: monthlyReadDraft.readingNumber,
     version: monthlyReadDraft.version, updatedAt: monthlyReadDraft.updatedAt,
     revisionId: monthlyReadRevision.id, sourceVersion: monthlyReadRevision.sourceVersion, publishedAt: monthlyReadRevision.publishedAt,
   }).from(monthlyReadDraft)
@@ -45,7 +45,7 @@ export async function readDraftSummaries(db: Database): Promise<DraftSummary[]> 
     return {
       period: row.period.slice(0, 7), titleTr: row.titleTr, titleEn: row.titleEn,
       version: row.version, updatedAt: row.updatedAt.toISOString(), publication,
-      isEmpty: isEmptyDraft({ titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn }),
+      isEmpty: isEmptyDraft({ titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn, readingNumber: row.readingNumber }),
     };
   });
 }
@@ -72,13 +72,15 @@ export async function saveDraft(db: Database, period: string, value: DraftInput)
     const titles = { titleTr: input.titleTr, titleEn: input.titleEn, author: input.author };
     if (input.expectedVersion === null) {
       const [createdBook] = await tx.insert(book).values(titles).returning({ id: book.id });
-      const [created] = await tx.insert(monthlyReadDraft).values({ period: month, bookId: createdBook.id, bandTr: input.bandTr, bandEn: input.bandEn }).onConflictDoNothing({ target: monthlyReadDraft.period }).returning();
+      const [created] = await tx.insert(monthlyReadDraft).values({ period: month, bookId: createdBook.id, bandTr: input.bandTr, bandEn: input.bandEn, readingNumber: input.readingNumber ?? null }).onConflictDoNothing({ target: monthlyReadDraft.period }).returning();
       if (!created) throw new HttpError(409, "Bu ay başka bir oturumda kaydedildi. Metniniz korundu.");
     } else {
-      const [locked] = await tx.select({ id: monthlyReadDraft.id, version: monthlyReadDraft.version }).from(monthlyReadDraft)
+      const [locked] = await tx.select({ id: monthlyReadDraft.id, version: monthlyReadDraft.version, readingNumber: monthlyReadDraft.readingNumber }).from(monthlyReadDraft)
         .where(eq(monthlyReadDraft.period, month)).for("update");
       if (!locked || locked.version !== input.expectedVersion) throw new HttpError(409, "Taslak başka bir oturumda değişti. Metniniz korundu.");
-      const [updated] = await tx.update(monthlyReadDraft).set({ bandTr: input.bandTr, bandEn: input.bandEn, version: sql`${monthlyReadDraft.version} + 1`, updatedAt: new Date() })
+      if (isEmptyDraft({ ...input, readingNumber: input.readingNumber === undefined ? locked.readingNumber : input.readingNumber })) throw new HttpError(422, "En az bir içerik alanı doldurun.");
+      const updateFields = { bandTr: input.bandTr, bandEn: input.bandEn, version: sql`${monthlyReadDraft.version} + 1`, updatedAt: new Date(), ...(input.readingNumber === undefined ? {} : { readingNumber: input.readingNumber }) };
+      const [updated] = await tx.update(monthlyReadDraft).set(updateFields)
         .where(eq(monthlyReadDraft.id, locked.id)).returning({ bookId: monthlyReadDraft.bookId });
       if (!updated) throw new Error("Locked draft disappeared");
       await tx.update(book).set(titles).where(eq(book.id, updated.bookId));
@@ -99,7 +101,7 @@ export async function readPublishedRevision(db: Database, revisionId: string): P
   const [row] = await db.select().from(monthlyReadRevision).where(eq(monthlyReadRevision.id, revisionId));
   return row ? {
     id: row.id, period: row.period.slice(0, 7), sourceVersion: row.sourceVersion,
-    titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn,
+    titleTr: row.titleTr, titleEn: row.titleEn, author: row.author, bandTr: row.bandTr, bandEn: row.bandEn, readingNumber: row.readingNumber,
     publishedAt: row.publishedAt.toISOString(),
   } : null;
 }
@@ -113,7 +115,7 @@ export async function publishDraft(db: Database, period: string, value: PublishI
     if (!locked) throw new HttpError(422, "Bu ay için kaydedilmiş bir taslak yok.");
     if (locked.version !== input.expectedVersion) throw new HttpError(409, "Taslak başka bir oturumda değişti. Yeniden yükleyip önizleyin.");
 
-    const [fields] = await tx.select({ titleTr: book.titleTr, titleEn: book.titleEn, author: book.author, bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn })
+    const [fields] = await tx.select({ titleTr: book.titleTr, titleEn: book.titleEn, author: book.author, bandTr: monthlyReadDraft.bandTr, bandEn: monthlyReadDraft.bandEn, readingNumber: monthlyReadDraft.readingNumber })
       .from(monthlyReadDraft).innerJoin(book, eq(book.id, monthlyReadDraft.bookId)).where(eq(monthlyReadDraft.id, locked.id));
     if (!fields) throw new Error("Locked draft fields missing");
     const issues = publicationIssues(fields as DraftFields);

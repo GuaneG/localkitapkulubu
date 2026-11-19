@@ -42,7 +42,7 @@ test("PostgreSQL lists admin draft summaries and resolves the published snapshot
   const { Pool } = await import("pg");
   const { drizzle } = await import("drizzle-orm/node-postgres");
   const { migrateDatabase } = await import("../../src/server/db/migrate.ts");
-  const { readDraftSummaries, readAdminDraft, readPublishedReferences, saveDraft, publishDraft } = await import("../../src/server/monthly-read/repository.ts");
+  const { readDraft, readDraftSummaries, readAdminDraft, readPublishedReferences, saveDraft, publishDraft } = await import("../../src/server/monthly-read/repository.ts");
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   const db = drizzle(pool);
   try {
@@ -60,6 +60,7 @@ test("PostgreSQL lists admin draft summaries and resolves the published snapshot
     const summaries = await readDraftSummaries(db);
     assert.deepEqual(summaries.map(({ period }) => period), ["2026-12", "2026-11", "2026-10"]);
     assert.deepEqual(summaries.map(({ isEmpty }) => isEmpty), [false, false, true]);
+    assert.equal((await readDraft(db, "2026-10"))?.readingNumber, null, "legacy drafts without a number read as NULL");
     assert.equal(summaries[1].titleTr, "Kısmi");
     assert.equal(Object.hasOwn(summaries[0], "bandTr"), false);
     assert.equal(summaries[0].publication?.revisionId, receiptA.revisionId);
@@ -126,7 +127,7 @@ test("PostgreSQL publishes immutable revisions and keeps one period pointer", { 
   try {
     await migrateDatabase(db);
     await pool.query("TRUNCATE monthly_read_publication, monthly_read_revision, monthly_read_draft, book CASCADE");
-    const draft = { expectedVersion: null, titleTr: "Kitap A", titleEn: "Book A", author: "Yazar A", bandTr: "Şerit A", bandEn: "Band A" };
+    const draft = { expectedVersion: null, titleTr: "Kitap A", titleEn: "Book A", author: "Yazar A", bandTr: "Şerit A", bandEn: "Band A", readingNumber: 38 };
     const first = await saveDraft(db, "2026-11", draft);
     const [receiptA, repeatedA] = await Promise.all([
       publishDraft(db, "2026-11", { expectedVersion: first.version }),
@@ -136,20 +137,41 @@ test("PostgreSQL publishes immutable revisions and keeps one period pointer", { 
     assert.equal((await pool.query("SELECT count(*) FROM monthly_read_revision")).rows[0].count, "1");
     assert.deepEqual(await readPublishedReferences(db, "2026-11"), [{ period: "2026-11", revisionId: receiptA.revisionId }]);
 
-    const second = await saveDraft(db, "2026-11", { ...draft, expectedVersion: first.version, titleTr: "Kitap B", titleEn: "Book B", author: "Yazar B", bandTr: "Şerit B", bandEn: "Band B" });
+    const secondFields = { titleTr: "Kitap B", titleEn: "Book B", author: "Yazar B", bandTr: "Şerit B", bandEn: "Band B" };
+    const second = await saveDraft(db, "2026-11", { ...secondFields, expectedVersion: first.version });
     assert.equal(second.version, 2);
     assert.equal(second.publication?.revisionId, receiptA.revisionId);
     assert.deepEqual(await readPublishedRevision(db, receiptA.revisionId), {
       id: receiptA.revisionId, period: "2026-11", sourceVersion: 1,
       titleTr: "Kitap A", titleEn: "Book A", author: "Yazar A", bandTr: "Şerit A", bandEn: "Band A",
-      publishedAt: receiptA.publishedAt,
+      readingNumber: 38, publishedAt: receiptA.publishedAt,
     });
     await assert.rejects(publishDraft(db, "2026-11", { expectedVersion: 1 }), { status: 409 });
     const receiptB = await publishDraft(db, "2026-11", { expectedVersion: second.version });
     assert.notEqual(receiptB.revisionId, receiptA.revisionId);
-    assert.deepEqual(await readPublishedReferences(db, "2026-11"), [{ period: "2026-11", revisionId: receiptB.revisionId }]);
+    assert.equal((await readPublishedRevision(db, receiptB.revisionId))?.readingNumber, 38);
+    const third = await saveDraft(db, "2026-11", { ...secondFields, expectedVersion: second.version, readingNumber: 39 });
+    assert.equal(third.readingNumber, 39);
+    assert.equal((await readPublishedRevision(db, receiptB.revisionId))?.readingNumber, 38);
+    const receiptC = await publishDraft(db, "2026-11", { expectedVersion: third.version });
+    assert.equal((await readPublishedRevision(db, receiptC.revisionId))?.readingNumber, 39);
+    const fourth = await saveDraft(db, "2026-11", { ...secondFields, expectedVersion: third.version });
+    assert.equal(fourth.readingNumber, 39, "omitting the field preserves the saved number");
+    const fifth = await saveDraft(db, "2026-11", { ...secondFields, expectedVersion: fourth.version, readingNumber: null });
+    assert.equal(fifth.readingNumber, null, "an explicit null clears the number");
+    await assert.rejects(pool.query("UPDATE monthly_read_draft SET reading_number = 0 WHERE period = '2026-11-01'"));
+    await assert.rejects(pool.query("UPDATE monthly_read_revision SET reading_number = -1 WHERE id = $1", [receiptC.revisionId]));
+    assert.deepEqual(await readPublishedReferences(db, "2026-11"), [{ period: "2026-11", revisionId: receiptC.revisionId }]);
     assert.equal((await readPublishedRevision(db, receiptA.revisionId))?.titleTr, "Kitap A");
     assert.equal((await readDraft(db, "2026-11"))?.titleTr, "Kitap B");
+    const emptyText = { titleTr: "", titleEn: "", author: "", bandTr: "", bandEn: "" };
+    const numberedPartial = await saveDraft(db, "2026-12", { ...secondFields, expectedVersion: null, readingNumber: 38 });
+    const numberOnly = await saveDraft(db, "2026-12", { ...emptyText, expectedVersion: numberedPartial.version });
+    assert.equal(numberOnly.readingNumber, 38, "clearing text in an old client preserves the omitted number");
+    assert.equal(numberOnly.titleTr, "");
+    await assert.rejects(publishDraft(db, "2026-12", { expectedVersion: numberOnly.version }), { status: 422 });
+    await assert.rejects(saveDraft(db, "2026-11", { ...emptyText, expectedVersion: fifth.version }), { status: 422 });
+    assert.equal((await readDraft(db, "2026-11"))?.version, fifth.version, "rejected empty update does not change the saved row");
   } finally { await pool.end(); }
 });
 

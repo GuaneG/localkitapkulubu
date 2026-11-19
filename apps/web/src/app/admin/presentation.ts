@@ -16,7 +16,7 @@ export function draftStatus(draft: Pick<DraftSummary, "version" | "publication" 
   return draft.publication.sourceVersion === draft.version ? "Yayında" : "Yeni taslak var";
 }
 export function previewRead(fields: DraftFields, period: string, locale: Locale): PublicRead {
-  return { revisionId: "private-preview", period,
+  return { revisionId: "private-preview", period, readingNumber: fields.readingNumber ?? null,
     title: (locale === "tr" ? fields.titleTr : fields.titleEn) || (locale === "tr" ? "Kitap adı henüz girilmedi" : "Book title not entered yet"),
     author: fields.author || (locale === "tr" ? "Yazar henüz girilmedi" : "Author not entered yet"),
     band: (locale === "tr" ? fields.bandTr : fields.bandEn) || (locale === "tr" ? "Bu dilde şerit metni henüz girilmedi." : "Band text not entered yet."),
